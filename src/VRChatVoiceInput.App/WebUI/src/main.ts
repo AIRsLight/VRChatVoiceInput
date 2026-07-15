@@ -1412,19 +1412,37 @@ function renderModels(): string {
   };
   const providerId = modelProviderIds[selectedModel];
   const status = getProviderStatus(providerId);
+  const modelAvailable = isAnyModelCombinationAvailable(selectedModel);
   return `<div class="view">
     <div class="model-tabs">${Object.entries(labels).map(([id, label]) =>
-      `<button class="model-tab ${selectedModel === id ? "active" : ""} ${getProviderStatus(modelProviderIds[id]).available ? "available" : "missing"}" data-model-tab="${id}"><span class="model-status-dot"></span>${label}</button>`).join("")}</div>
+      `<button class="model-tab ${selectedModel === id ? "active" : ""} ${isAnyModelCombinationAvailable(id) ? "available" : "missing"}" data-model-tab="${id}"><span class="model-status-dot"></span>${label}</button>`).join("")}</div>
     ${renderModelDownloadProgress(providerId)}
-    <div class="availability-bar ${status.available ? "available" : "missing"}">
-      ${icon(status.available ? "Check" : "CircleAlert")}
-      <span>${status.available ? `${escapeHtml(status.id)} ${t("installed and available")}.` : escapeHtml(t("Missing files: {files}", { files: status.missingFiles.join(", ") }))}</span>
+    <div class="availability-bar ${modelAvailable ? "available" : "missing"}">
+      ${icon(modelAvailable ? "Check" : "CircleAlert")}
+      <span>${modelAvailable ? `${escapeHtml(status.id)} ${t("installed and available")}.` : escapeHtml(t("Missing files: {files}", { files: status.missingFiles.join(", ") }))}</span>
     </div>
     ${renderModelVariantSelection(selectedModel)}
     ${renderModelFacts(selectedModel)}
     ${renderModelCapabilities(selectedModel, providerId)}
     ${renderAdvancedModelConfiguration(selectedModel)}
   </div>`;
+}
+
+function isAnyModelCombinationAvailable(model: string): boolean {
+  const providerId = modelProviderIds[model];
+  if (getProviderStatus(providerId).available) return true;
+
+  const assets = snapshot!.modelAssets.filter(asset => asset.providerId === providerId);
+  const hasInstalled = (componentId: string): boolean =>
+    assets.some(asset => asset.componentId === componentId && asset.installed);
+  const hasRuntime = model === "qwen3Asr" || assets.some(asset =>
+    asset.componentId.startsWith("runtime-") && asset.installed);
+  const hasPrimaryModel = hasInstalled(getPrimaryModelComponentId(model));
+  const hasRequiredSecondaryModels = model !== "funAsrNano" || hasInstalled("encoder");
+  const hasRequiredPunctuation = model !== "paraformer" ||
+    !configuration!.asr.paraformer.usePunctuation ||
+    hasInstalled("punctuation");
+  return hasRuntime && hasPrimaryModel && hasRequiredSecondaryModels && hasRequiredPunctuation;
 }
 
 function renderAdvancedModelConfiguration(model: string): string {

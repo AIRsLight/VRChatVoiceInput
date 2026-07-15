@@ -61,7 +61,9 @@ Selecting a row in the desktop profile editor only opens it for editing. `Use pr
 
 `id` is both the profile name shown in the interface and its unique configuration identifier. Names may contain spaces and non-ASCII characters but cannot be empty or duplicated case-insensitively. `builtIn` identifies profiles shipped by the application. It does not make a profile immutable in the JSON configuration.
 
-New and existing installations include a built-in `VRCHAT Desktop` profile. It matches `VRChat.exe`, uses left Ctrl (`VK_LCONTROL`, `0xA2`) as its keyboard PTT trigger, and sends recognized text through the VRChat OSC Chatbox output. Existing installations receive it without overwriting an already configured profile with the same name.
+The built-in `VRChat` profile uses the SteamVR PTT action and sends recognized text through the VRChat OSC Chatbox output. Existing profiles that still use the old built-in F8 default are migrated to SteamVR; customized input bindings are preserved.
+
+New and existing installations also include a built-in `VRCHAT Desktop` profile. It matches `VRChat.exe`, uses left Ctrl (`VK_LCONTROL`, `0xA2`) as its keyboard PTT trigger, and uses the same VRChat OSC output. Existing installations receive it without overwriting an already configured profile with the same name.
 
 ## Profile microphone
 
