@@ -1,0 +1,32 @@
+bin/
+obj/
+.vs/
+appsettings.json
+runtimes/
+models/
+node_modules/
+.vite/
+dist/
+artifacts/
+.tmp/
+
+# Native binaries, model weights, recordings, and distributable archives are
+# fetched or generated outside Git history.
+*.dll
+*.exe
+*.pdb
+*.lib
+*.onnx
+*.gguf
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.wav
+*.mp3
+*.flac
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tar.bz2

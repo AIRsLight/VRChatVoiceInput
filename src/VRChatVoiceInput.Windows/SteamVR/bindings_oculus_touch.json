@@ -1,0 +1,20 @@
+{
+  "controller_type": "oculus_touch",
+  "name": "Voice Input Touch bindings",
+  "description": "Left controller X button activates push to talk",
+  "bindings": {
+    "/actions/voiceinput": {
+      "sources": [
+        {
+          "path": "/user/hand/left/input/x",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/voiceinput/in/ptt"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

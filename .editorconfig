@@ -1,0 +1,4 @@
+root = true
+
+[third_party/openvr/openvr_api.cs]
+generated_code = true

@@ -1,0 +1,44 @@
+{
+  "default_bindings": [
+    {
+      "controller_type": "generic",
+      "binding_url": "bindings_generic.json"
+    },
+    {
+      "controller_type": "vive_controller",
+      "binding_url": "bindings_vive_controller.json"
+    },
+    {
+      "controller_type": "knuckles",
+      "binding_url": "bindings_knuckles.json"
+    },
+    {
+      "controller_type": "oculus_touch",
+      "binding_url": "bindings_oculus_touch.json"
+    }
+  ],
+  "actions": [
+    {
+      "name": "/actions/voiceinput/in/ptt",
+      "type": "boolean"
+    }
+  ],
+  "action_sets": [
+    {
+      "name": "/actions/voiceinput",
+      "usage": "single"
+    }
+  ],
+  "localization": [
+    {
+      "language_tag": "en_US",
+      "/actions/voiceinput": "Voice Input",
+      "/actions/voiceinput/in/ptt": "Push to talk"
+    },
+    {
+      "language_tag": "zh_CN",
+      "/actions/voiceinput": "语音输入",
+      "/actions/voiceinput/in/ptt": "按住说话"
+    }
+  ]
+}

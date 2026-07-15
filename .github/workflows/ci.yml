@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/VRChatVoiceInput.App/WebUI/package-lock.json
+
+      - name: Fetch pinned OpenVR native dependency
+        shell: pwsh
+        run: ./fetch-openvr.ps1
+
+      - name: Install WebUI dependencies
+        working-directory: src/VRChatVoiceInput.App/WebUI
+        run: npm ci
+
+      - name: Type-check WebUI
+        working-directory: src/VRChatVoiceInput.App/WebUI
+        run: npm run typecheck
+
+      - name: Build WebUI
+        working-directory: src/VRChatVoiceInput.App/WebUI
+        run: npm run build
+
+      - name: Restore .NET dependencies
+        run: dotnet restore VRChatVoiceInput.sln
+
+      - name: Build solution
+        run: dotnet build VRChatVoiceInput.sln --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test VRChatVoiceInput.sln --configuration Release --no-build

@@ -1,0 +1,20 @@
+{
+  "controller_type": "knuckles",
+  "name": "Voice Input Index bindings",
+  "description": "Right controller A button activates push to talk",
+  "bindings": {
+    "/actions/voiceinput": {
+      "sources": [
+        {
+          "path": "/user/hand/right/input/a",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/voiceinput/in/ptt"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

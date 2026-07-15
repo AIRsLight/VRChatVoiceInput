@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <ProjectReference Include="..\VRChatVoiceInput.Core\VRChatVoiceInput.Core.csproj" />
+    <ProjectReference Include="..\VRChatVoiceInput.OpenVR\VRChatVoiceInput.OpenVR.csproj" />
+    <EmbeddedResource Include="SteamVR\*.json" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,20 @@
+{
+  "controller_type": "generic",
+  "name": "Voice Input generic bindings",
+  "description": "Right controller menu button activates push to talk",
+  "bindings": {
+    "/actions/voiceinput": {
+      "sources": [
+        {
+          "path": "/user/hand/right/input/application_menu",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/voiceinput/in/ptt"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
