@@ -264,7 +264,7 @@ internal sealed class CommandLineApplication
             var matches = profile.Match.ProcessNames.Count == 0
                 ? "current foreground"
                 : string.Join(", ", profile.Match.ProcessNames);
-            Console.WriteLine($"{profile.Id}{marker}: {profile.DisplayName} [{matches}]");
+            Console.WriteLine($"{profile.Id}{marker} [{matches}]");
         }
     }
 
@@ -475,6 +475,12 @@ internal sealed class CommandLineApplication
             new()
             {
                 Id = "vrchat",
+                Match = new ApplicationMatchConfiguration { ProcessNames = ["VRChat.exe"] },
+                Recognition = new ProfileRecognitionConfiguration { Provider = "paraformer-gguf" }
+            },
+            new()
+            {
+                Id = "vrchat-alternative",
                 Match = new ApplicationMatchConfiguration { ProcessNames = ["VRChat.exe"] },
                 Recognition = new ProfileRecognitionConfiguration { Provider = "paraformer-gguf" }
             }

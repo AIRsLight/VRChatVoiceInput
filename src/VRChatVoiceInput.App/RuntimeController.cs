@@ -28,6 +28,7 @@ public sealed class RuntimeController : IAsyncDisposable
     public RuntimeController(string configurationPath)
     {
         ConfigurationPath = Path.GetFullPath(configurationPath);
+        MigrateLegacyProfileNames(ConfigurationPath);
         _profileOverride = LoadConfiguration().GetEffectiveDefaultProfileId();
     }
 
@@ -180,15 +181,27 @@ public sealed class RuntimeController : IAsyncDisposable
     public async Task SaveConfigurationAsync(string json, CancellationToken cancellationToken = default)
     {
         var previousConfiguration = LoadConfiguration();
+        var previousProfiles = previousConfiguration.GetEffectiveProfiles();
         var previousProfileOverride = _profileOverride;
         var configuration = AppConfiguration.Parse(json);
         var profiles = configuration.GetEffectiveProfiles();
-        EnsureSelectedProvidersAvailable(configuration, _profileOverride);
         if (_profileOverride is not null && !profiles.Any(profile =>
                 profile.Enabled && string.Equals(profile.Id, _profileOverride, StringComparison.OrdinalIgnoreCase)))
         {
-            _profileOverride = null;
+            var previousEntry = previousProfiles
+                .Select((profile, index) => (profile, index))
+                .FirstOrDefault(entry => string.Equals(
+                    entry.profile.Id,
+                    _profileOverride,
+                    StringComparison.OrdinalIgnoreCase));
+            _profileOverride = profiles.Count == previousProfiles.Count &&
+                               previousEntry.profile is not null &&
+                               previousEntry.index < profiles.Count &&
+                               profiles[previousEntry.index].Enabled
+                ? profiles[previousEntry.index].Id
+                : null;
         }
+        EnsureSelectedProvidersAvailable(configuration, _profileOverride);
         var restartRuntime = IsRunning && !string.Equals(
             CreateRuntimeConfigurationFingerprint(previousConfiguration, previousProfileOverride),
             CreateRuntimeConfigurationFingerprint(configuration, _profileOverride),
@@ -588,6 +601,71 @@ public sealed class RuntimeController : IAsyncDisposable
     {
         using var document = JsonDocument.Parse(json);
         return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private static void MigrateLegacyProfileNames(string path)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
+        var profiles = root?["profiles"] as JsonObject;
+        var items = profiles?["items"] as JsonArray;
+        if (root is null || profiles is null || items is null)
+        {
+            return;
+        }
+        if (!items.OfType<JsonObject>().Any(item => item.ContainsKey("displayName")))
+        {
+            return;
+        }
+
+        var changed = false;
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var renamedProfiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in items.OfType<JsonObject>())
+        {
+            var oldId = item["id"]?.GetValue<string>()?.Trim();
+            if (string.IsNullOrWhiteSpace(oldId))
+            {
+                continue;
+            }
+
+            var legacyName = item["displayName"]?.GetValue<string>()?.Trim();
+            var baseName = string.IsNullOrWhiteSpace(legacyName) ? oldId : legacyName;
+            var name = baseName;
+            var suffix = 2;
+            while (!names.Add(name))
+            {
+                name = $"{baseName} ({suffix++})";
+            }
+
+            renamedProfiles[oldId] = name;
+            if (!string.Equals(oldId, name, StringComparison.Ordinal))
+            {
+                item["id"] = name;
+                changed = true;
+            }
+            if (item.Remove("displayName"))
+            {
+                changed = true;
+            }
+        }
+
+        var defaultProfileId = profiles["defaultProfileId"]?.GetValue<string>();
+        if (defaultProfileId is not null &&
+            renamedProfiles.TryGetValue(defaultProfileId, out var renamedDefault) &&
+            !string.Equals(defaultProfileId, renamedDefault, StringComparison.Ordinal))
+        {
+            profiles["defaultProfileId"] = renamedDefault;
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        var temporaryPath = path + ".migration.tmp";
+        File.WriteAllText(temporaryPath, FormatJson(root.ToJsonString()));
+        File.Move(temporaryPath, path, overwrite: true);
     }
 
     private static void EnsureSelectedProvidersAvailable(AppConfiguration configuration, string? profileOverride)

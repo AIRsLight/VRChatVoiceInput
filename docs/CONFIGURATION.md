@@ -29,7 +29,7 @@ Automatic and CLI selection order is:
 3. An enabled profile with an empty `match.processNames`, representing the application that is in the foreground when PTT is pressed. If the default profile is empty, it is preferred; otherwise configuration order is used.
 4. `profiles.defaultProfileId` when no process match or current-foreground profile exists.
 
-Process matching is case-insensitive and treats `VRChat` and `VRChat.exe` as the same name. Duplicate profile IDs and duplicate process matches are rejected during configuration loading.
+Process matching is case-insensitive and treats `VRChat` and `VRChat.exe` as the same name. A process may be assigned to multiple profiles because only one explicitly selected profile runs at a time. In automatic-routing mode, the first enabled matching profile in configuration order wins. Profile names must be unique, and duplicate process names inside one profile are rejected.
 
 For `captured-window` output, the current foreground window is captured and locked when PTT is pressed. Leaving `match.processNames` empty therefore creates a reusable profile for whichever desktop application is active, without writing that process name back into the configuration.
 
@@ -43,8 +43,7 @@ Selecting a row in the desktop profile editor only opens it for editing. `Use pr
 
 ```json
 {
-  "id": "example-game",
-  "displayName": "Example Game",
+  "id": "Example Game",
   "enabled": true,
   "builtIn": false,
   "match": {
@@ -60,7 +59,7 @@ Selecting a row in the desktop profile editor only opens it for editing. `Use pr
 }
 ```
 
-`builtIn` identifies profiles shipped by the application. It does not make a profile immutable in the JSON configuration.
+`id` is both the profile name shown in the interface and its unique configuration identifier. Names may contain spaces and non-ASCII characters but cannot be empty or duplicated case-insensitively. `builtIn` identifies profiles shipped by the application. It does not make a profile immutable in the JSON configuration.
 
 ## Profile microphone
 

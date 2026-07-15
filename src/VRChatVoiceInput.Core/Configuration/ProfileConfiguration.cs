@@ -17,9 +17,6 @@ public sealed class ApplicationProfileConfiguration
     [JsonPropertyName("id")]
     public string Id { get; init; } = string.Empty;
 
-    [JsonPropertyName("displayName")]
-    public string DisplayName { get; init; } = string.Empty;
-
     [JsonPropertyName("enabled")]
     public bool Enabled { get; init; } = true;
 
@@ -84,17 +81,21 @@ internal static class ProfileConfigurationValidator
         }
 
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var processNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var profile in profiles)
         {
             if (string.IsNullOrWhiteSpace(profile.Id))
             {
-                throw new InvalidOperationException("Every application profile must have a non-empty id.");
+                throw new InvalidOperationException("Every application profile must have a non-empty name.");
+            }
+            if (!string.Equals(profile.Id, profile.Id.Trim(), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Application profile name '{profile.Id}' cannot have leading or trailing whitespace.");
             }
 
             if (!ids.Add(profile.Id))
             {
-                throw new InvalidOperationException($"Duplicate application profile id '{profile.Id}'.");
+                throw new InvalidOperationException($"Duplicate application profile name '{profile.Id}'.");
             }
 
             if (string.IsNullOrWhiteSpace(profile.Recognition.Provider))
@@ -141,6 +142,7 @@ internal static class ProfileConfigurationValidator
                 }
             }
 
+            var processNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var configuredName in profile.Match.ProcessNames)
             {
                 var processName = ApplicationProfileResolver.NormalizeProcessName(configuredName);
@@ -149,13 +151,11 @@ internal static class ProfileConfigurationValidator
                     throw new InvalidOperationException($"Profile '{profile.Id}' contains an empty process name.");
                 }
 
-                if (processNames.TryGetValue(processName, out var existingProfileId))
+                if (!processNames.Add(processName))
                 {
                     throw new InvalidOperationException(
-                        $"Process '{configuredName}' is matched by both '{existingProfileId}' and '{profile.Id}'.");
+                        $"Profile '{profile.Id}' contains duplicate process name '{configuredName}'.");
                 }
-
-                processNames.Add(processName, profile.Id);
             }
         }
 

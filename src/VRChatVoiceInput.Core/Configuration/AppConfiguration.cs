@@ -56,7 +56,6 @@ public sealed class AppConfiguration
                 new ApplicationProfileConfiguration
                 {
                     Id = "legacy-default",
-                    DisplayName = "Legacy default",
                     Input = Input,
                     Recognition = new ProfileRecognitionConfiguration { Provider = Asr.Provider },
                     Output = new OutputConfiguration

@@ -144,7 +144,7 @@ public partial class MainWindow
         var provider = JsonSerializer.Serialize(testCase.ProviderId);
         await ExecuteRequiredUiScriptAsync(
             "const profiles = document.querySelector('[data-view=\"profiles\"]'); if (!profiles) return false; profiles.click();" +
-            "const profile = document.querySelector('[data-profile-id=\"desktop-default\"]'); if (profile) profile.click();" +
+            "const profile = document.querySelector('[data-profile-id=\"Desktop default\"]'); if (profile) profile.click();" +
             "const processing = document.querySelector('[data-profile-tab=\"processing\"]'); if (!processing) return false; processing.click();" +
             "const select = document.querySelector('select[data-config-path$=\".recognition.provider\"]');" +
             $"if (!select || !Array.from(select.options).some(option => option.value === {provider})) return false;" +
@@ -160,7 +160,7 @@ public partial class MainWindow
         while (DateTime.UtcNow < deadline)
         {
             var configuration = _runtimeController.LoadConfiguration();
-            var profile = configuration.GetEffectiveProfiles().First(profile => profile.Id == "desktop-default");
+            var profile = configuration.GetEffectiveProfiles().First(profile => profile.Id == "Desktop default");
             var providerMatches = string.Equals(
                 profile.Recognition.Provider,
                 testCase.ProviderId,

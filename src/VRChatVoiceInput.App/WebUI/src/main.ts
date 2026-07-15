@@ -109,7 +109,7 @@ interface OutputSettings {
 
 interface Profile {
   id: string;
-  displayName: string;
+  displayName?: string;
   enabled: boolean;
   builtIn: boolean;
   match: { processNames: string[] };
@@ -579,7 +579,7 @@ window.chrome.webview.addEventListener("message", event => {
     }
   } else if (message.type === "runtime.state") {
     snapshot.runtime.isRunning = (message.payload as { isRunning: boolean }).isRunning;
-    render();
+    updateTopbar();
   } else if (message.type === "model.download.progress") {
     modelDownload = message.payload as ModelDownloadProgress;
     snapshot.modelDownload = modelDownload;
@@ -657,6 +657,7 @@ function normalizeConfiguration(config: AppConfiguration): AppConfiguration {
     maximumSegmentSeconds: 15
   };
   for (const profile of config.profiles.items) {
+    delete profile.displayName;
     profile.audio ??= { deviceId: null, minimumDurationMs: null };
     profile.audio.minimumDurationMs ??= null;
     profile.input.keyboard.virtualKeys ??= [profile.input.keyboard.virtualKey ?? 119];
@@ -890,7 +891,7 @@ function renderGeneral(): string {
       `<option value="${escapeHtml(device.id)}" ${device.id === config.audio.deviceId ? "selected" : ""}>${escapeHtml(device.name)}</option>`)
   ].join("");
   const profileOptions = config.profiles.items.map(profile =>
-    `<option value="${escapeHtml(profile.id)}" ${profile.id === config.profiles.defaultProfileId ? "selected" : ""}>${escapeHtml(profile.displayName)}</option>`)
+    `<option value="${escapeHtml(profile.id)}" ${profile.id === config.profiles.defaultProfileId ? "selected" : ""}>${escapeHtml(profile.id)}</option>`)
     .join("");
 
   return `<div class="view">
@@ -1160,7 +1161,7 @@ function renderProfiles(): string {
     (!profile.recognition.streamingEnabled || providerStatus.streamingAvailable);
   const profileItems = config.profiles.items.map(item =>
     `<button class="profile-item ${item.id === profile.id ? "active" : ""} ${item.id === runtimeProfileId ? "runtime-active" : ""}" data-profile-id="${escapeHtml(item.id)}">
-      <span><span class="profile-name">${escapeHtml(item.displayName)}</span><span class="profile-match">${escapeHtml(profileSummary(item))}</span></span>
+      <span><span class="profile-name">${escapeHtml(item.id)}</span><span class="profile-match">${escapeHtml(profileSummary(item))}</span></span>
       <span class="profile-badges">${item.id === runtimeProfileId ? `<span class="profile-badge active">${t("Active")}</span>` : ""}${item.id === config.profiles.defaultProfileId ? `<span class="profile-badge">${t("Default")}</span>` : ""}</span>
     </button>`).join("");
 
@@ -1189,7 +1190,7 @@ function renderProfiles(): string {
           <button class="profile-tab ${activeProfileTab === "output" ? "active" : ""}" data-profile-tab="output">${t("Output")}</button>
         </div>
         <div class="profile-tab-content">
-          ${activeProfileTab === "input" ? `${renderProfileIdentity(profile, base)}${renderProfileInput(profile, base)}${renderProfileAudio(profile, base)}` : ""}
+          ${activeProfileTab === "input" ? `${renderProfileIdentity(profile)}${renderProfileInput(profile, base)}${renderProfileAudio(profile, base)}` : ""}
           ${activeProfileTab === "processing" ? renderProfileRecognition(profile, base) : ""}
           ${activeProfileTab === "output" ? renderProfileOutput(profile, base) : ""}
         </div>
@@ -1198,14 +1199,11 @@ function renderProfiles(): string {
   </div>`;
 }
 
-function renderProfileIdentity(profile: Profile, base: string): string {
+function renderProfileIdentity(profile: Profile): string {
   return `<section class="settings-section">
     <div><h2 class="section-title">${t("Application")}</h2><div class="section-meta">${t(profile.builtIn ? "Built-in profile" : "Custom profile")}</div></div>
     <div class="field-stack">
-      <div class="field-row">
-        <div class="field"><label>${t("Display name")}</label><input class="input" data-config-path="${base}.displayName" value="${escapeHtml(profile.displayName)}" /></div>
-        <div class="field"><label>${t("Profile ID")}</label><input class="input" data-profile-id-input="true" value="${escapeHtml(profile.id)}" ${profile.builtIn ? "readonly" : ""} /></div>
-      </div>
+      <div class="field"><label>${t("Profile name")}</label><input class="input" data-profile-name-input="true" value="${escapeHtml(profile.id)}" /></div>
       <div class="field">
         <label>${t("Process names")}</label>
         <div class="input-with-button">
@@ -1882,7 +1880,7 @@ function renderDiagnostics(): string {
   }
   const selectedProfile = profiles.find(profile => profile.id === diagnosticProfileId) ?? null;
   const profileOptions = profiles.map(profile =>
-    `<option value="${escapeHtml(profile.id)}" ${profile.id === diagnosticProfileId ? "selected" : ""}>${escapeHtml(profile.displayName)} · ${escapeHtml(profile.output.mode)}</option>`).join("");
+    `<option value="${escapeHtml(profile.id)}" ${profile.id === diagnosticProfileId ? "selected" : ""}>${escapeHtml(profile.id)} · ${escapeHtml(profile.output.mode)}</option>`).join("");
   const applications = snapshot!.runningApplications;
   const configuredProcessNames = new Set(
     (selectedProfile?.match.processNames ?? []).map(name => name.replace(/\.exe$/i, "").toLowerCase()));
@@ -2207,7 +2205,7 @@ function bindProfileEvents(): void {
     markDirty();
     render();
   });
-  document.querySelector<HTMLInputElement>("[data-profile-id-input]")?.addEventListener("change", event => {
+  document.querySelector<HTMLInputElement>("[data-profile-name-input]")?.addEventListener("change", event => {
     const input = event.currentTarget as HTMLInputElement;
     renameProfile(input.value);
   });
@@ -2406,7 +2404,7 @@ async function refreshDiagnosticMetrics(): Promise<void> {
   }
 }
 
-function uniqueProfileId(base: string): string {
+function uniqueProfileName(base: string): string {
   const existing = new Set(configuration!.profiles.items.map(profile => profile.id.toLowerCase()));
   let candidate = base;
   let suffix = 2;
@@ -2419,8 +2417,8 @@ function uniqueProfileId(base: string): string {
 function addProfile(): void {
   const source = getProfile();
   const profile = deepClone(source);
-  profile.id = uniqueProfileId("new-profile");
-  profile.displayName = t("New profile");
+  profile.id = uniqueProfileName(t("New profile"));
+  delete profile.displayName;
   profile.builtIn = false;
   profile.match.processNames = [];
   configuration!.profiles.items.push(profile);
@@ -2432,8 +2430,8 @@ function addProfile(): void {
 function duplicateProfile(): void {
   const source = getProfile();
   const profile = deepClone(source);
-  profile.id = uniqueProfileId(`${source.id}-copy`);
-  profile.displayName = t("{name} copy", { name: source.displayName });
+  profile.id = uniqueProfileName(t("{name} copy", { name: source.id }));
+  delete profile.displayName;
   profile.builtIn = false;
   configuration!.profiles.items.push(profile);
   selectedProfileId = profile.id;
@@ -2456,21 +2454,43 @@ function deleteProfile(): void {
 }
 
 function renameProfile(value: string): void {
-  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "");
+  const normalized = value.trim();
   const profile = getProfile();
-  if (!normalized || configuration!.profiles.items.some(item => item !== profile && item.id.toLowerCase() === normalized)) {
-    showToast(t("Profile ID must be unique."), true);
-    render();
+  if (!normalized) {
+    showToast(t("Profile name is required."), true);
+    const input = document.querySelector<HTMLInputElement>("[data-profile-name-input]");
+    if (input) input.value = profile.id;
     return;
   }
+  if (configuration!.profiles.items.some(item => item !== profile && item.id.toLowerCase() === normalized.toLowerCase())) {
+    showToast(t("Profile name must be unique."), true);
+    const input = document.querySelector<HTMLInputElement>("[data-profile-name-input]");
+    if (input) input.value = profile.id;
+    return;
+  }
+  if (normalized === profile.id) return;
   const oldId = profile.id;
   profile.id = normalized;
+  delete profile.displayName;
   if (configuration!.profiles.defaultProfileId === oldId) {
     configuration!.profiles.defaultProfileId = normalized;
   }
+  if (snapshot!.runtime.profileOverride === oldId) {
+    snapshot!.runtime.profileOverride = normalized;
+  }
   selectedProfileId = normalized;
   markDirty();
-  render();
+  const profileButton = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-profile-id]"))
+    .find(button => button.dataset.profileId === oldId);
+  if (profileButton) {
+    profileButton.dataset.profileId = normalized;
+    const name = profileButton.querySelector<HTMLElement>(".profile-name");
+    if (name) name.textContent = normalized;
+  }
+  const routingLabel = document.querySelector<HTMLElement>(".routing-label");
+  if (routingLabel && snapshot!.runtime.profileOverride === normalized) {
+    routingLabel.textContent = t("Runtime: {profile}", { profile: normalized });
+  }
 }
 
 function formatKeys(keys: number[]): string {
@@ -2617,7 +2637,7 @@ async function toggleRuntime(): Promise<void> {
     showError(error);
   } finally {
     busy = false;
-    render();
+    updateTopbar();
   }
 }
 
@@ -2652,7 +2672,7 @@ async function saveConfiguration(): Promise<void> {
     retryDelay = 5000;
   } finally {
     saveInProgress = false;
-    render();
+    updateTopbar();
   }
 
   if (failure) showError(failure);
