@@ -110,6 +110,7 @@ interface OutputSettings {
 interface Profile {
   id: string;
   displayName?: string;
+  builtInTemplate?: string;
   enabled: boolean;
   builtIn: boolean;
   match: { processNames: string[] };
@@ -2419,6 +2420,7 @@ function addProfile(): void {
   const profile = deepClone(source);
   profile.id = uniqueProfileName(t("New profile"));
   delete profile.displayName;
+  delete profile.builtInTemplate;
   profile.builtIn = false;
   profile.match.processNames = [];
   configuration!.profiles.items.push(profile);
@@ -2432,6 +2434,7 @@ function duplicateProfile(): void {
   const profile = deepClone(source);
   profile.id = uniqueProfileName(t("{name} copy", { name: source.id }));
   delete profile.displayName;
+  delete profile.builtInTemplate;
   profile.builtIn = false;
   configuration!.profiles.items.push(profile);
   selectedProfileId = profile.id;

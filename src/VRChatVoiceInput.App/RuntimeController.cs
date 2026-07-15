@@ -15,6 +15,8 @@ namespace VRChatVoiceInput.App;
 public sealed class RuntimeController : IAsyncDisposable
 {
     private const int MaximumLogEntries = 300;
+    private const string VrChatDesktopProfileName = "VRCHAT Desktop";
+    private const string VrChatDesktopTemplateId = "vrchat-desktop";
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly SemaphoreSlim _microphoneTestGate = new(1, 1);
     private readonly List<RuntimeLogEventArgs> _logs = new();
@@ -29,6 +31,7 @@ public sealed class RuntimeController : IAsyncDisposable
     {
         ConfigurationPath = Path.GetFullPath(configurationPath);
         MigrateLegacyProfileNames(ConfigurationPath);
+        EnsureVrChatDesktopProfile(ConfigurationPath);
         _profileOverride = LoadConfiguration().GetEffectiveDefaultProfileId();
     }
 
@@ -664,6 +667,96 @@ public sealed class RuntimeController : IAsyncDisposable
         }
 
         var temporaryPath = path + ".migration.tmp";
+        File.WriteAllText(temporaryPath, FormatJson(root.ToJsonString()));
+        File.Move(temporaryPath, path, overwrite: true);
+    }
+
+    private static void EnsureVrChatDesktopProfile(string path)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
+        var items = root?["profiles"]?["items"] as JsonArray;
+        if (root is null || items is null || items.OfType<JsonObject>().Any(item =>
+                string.Equals(
+                    item["id"]?.GetValue<string>(),
+                    VrChatDesktopProfileName,
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    item["builtInTemplate"]?.GetValue<string>(),
+                    VrChatDesktopTemplateId,
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        var source = items.OfType<JsonObject>().FirstOrDefault(item => string.Equals(
+                         item["id"]?.GetValue<string>(),
+                         "VRChat",
+                         StringComparison.OrdinalIgnoreCase))
+                     ?? items.OfType<JsonObject>().FirstOrDefault(item => string.Equals(
+                         item["output"]?["mode"]?.GetValue<string>(),
+                         "vrchat-osc",
+                         StringComparison.OrdinalIgnoreCase));
+        var profile = source?.DeepClone().AsObject() ?? new JsonObject();
+        profile["id"] = VrChatDesktopProfileName;
+        profile["builtInTemplate"] = VrChatDesktopTemplateId;
+        profile.Remove("displayName");
+        profile["enabled"] = true;
+        profile["builtIn"] = true;
+        profile["audio"] ??= new JsonObject
+        {
+            ["deviceId"] = null,
+            ["minimumDurationMs"] = null
+        };
+        profile["match"] = new JsonObject
+        {
+            ["processNames"] = new JsonArray { "VRChat.exe" }
+        };
+
+        var input = profile["input"] as JsonObject ?? new JsonObject();
+        profile["input"] = input;
+        input["mode"] = "keyboard";
+        input["keyboard"] = new JsonObject
+        {
+            ["virtualKeys"] = new JsonArray { 0xA2 },
+            ["suppressKey"] = false
+        };
+        input["mouse"] ??= new JsonObject
+        {
+            ["button"] = "x1",
+            ["suppressButton"] = false
+        };
+        input["gamepad"] ??= new JsonObject
+        {
+            ["userIndex"] = 0,
+            ["buttonMask"] = 0x1000,
+            ["pollIntervalMs"] = 8
+        };
+        input["steamVr"] ??= new JsonObject
+        {
+            ["actionPath"] = "/actions/voiceinput/in/ptt",
+            ["pollIntervalMs"] = 8
+        };
+
+        var recognition = profile["recognition"] as JsonObject ?? new JsonObject();
+        profile["recognition"] = recognition;
+        recognition["provider"] ??= root["asr"]?["provider"]?.DeepClone() ?? "paraformer-gguf";
+        recognition["language"] ??= "auto";
+        recognition["hotwords"] ??= new JsonArray();
+        recognition["streamingEnabled"] ??= false;
+
+        var output = profile["output"] as JsonObject ?? new JsonObject();
+        profile["output"] = output;
+        output["mode"] = "vrchat-osc";
+        output["vrChat"] ??= root["vrChat"]?.DeepClone() ?? new JsonObject
+        {
+            ["host"] = "127.0.0.1",
+            ["port"] = 9000,
+            ["sendImmediately"] = true,
+            ["maxChatboxCharacters"] = 144
+        };
+
+        items.Add(profile);
+        var temporaryPath = path + ".built-in-profile.tmp";
         File.WriteAllText(temporaryPath, FormatJson(root.ToJsonString()));
         File.Move(temporaryPath, path, overwrite: true);
     }

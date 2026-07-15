@@ -61,6 +61,8 @@ Selecting a row in the desktop profile editor only opens it for editing. `Use pr
 
 `id` is both the profile name shown in the interface and its unique configuration identifier. Names may contain spaces and non-ASCII characters but cannot be empty or duplicated case-insensitively. `builtIn` identifies profiles shipped by the application. It does not make a profile immutable in the JSON configuration.
 
+New and existing installations include a built-in `VRCHAT Desktop` profile. It matches `VRChat.exe`, uses left Ctrl (`VK_LCONTROL`, `0xA2`) as its keyboard PTT trigger, and sends recognized text through the VRChat OSC Chatbox output. Existing installations receive it without overwriting an already configured profile with the same name.
+
 ## Profile microphone
 
 `audio.deviceId` inside a profile selects its capture device. `null` inherits the global `audio.deviceId`; this allows the VRChat profile to use a remote VR microphone while desktop profiles use the normal communications device. Disconnected configured devices remain visible as unavailable in the editor instead of silently changing microphones.
