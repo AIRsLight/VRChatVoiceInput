@@ -49,7 +49,7 @@ The WPF layer does not own runtime state or bypass controller-side validation. L
 ## Window lifecycle
 
 - `application.closeToTray` controls whether closing settings leaves the background service running.
-- Pending changes are saved before disposal. A validation or write failure keeps the window open and exposes the error.
+- Pending changes are saved before disposal. Closing waits at most five seconds for saving; a validation failure, write failure, or timeout is logged and shown once, then unsaved changes are discarded so the window and tray Exit command cannot become permanently blocked.
 - Reopening settings creates a fresh `NativeMainWindow` connected to the existing controller.
 - Application exit closes the settings window only after pending saves complete, then disposes the tray and runtime services.
 

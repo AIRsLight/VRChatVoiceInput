@@ -237,6 +237,8 @@ internal static class NativeWpfLocalization
         ["Test output sent."] = "测试文本已发送。",
         ["Changes are saved automatically."] = "修改会自动保存。",
         ["Operation failed"] = "操作失败",
+        ["Unable to save settings"] = "无法保存设置",
+        ["Settings could not be saved. Unsaved changes will be discarded so the window can close."] = "设置无法保存。未保存的修改将被丢弃，但窗口仍会关闭。",
         ["Profile names must be unique and cannot be empty."] = "预设名称不能为空且不能重复。",
         ["At least one profile is required."] = "至少需要保留一个预设。",
         ["Speech threshold"] = "语音阈值",
@@ -485,7 +487,9 @@ internal static class NativeWpfLocalization
         ["Minimum silence (seconds)"] = "最短無音時間（秒）",
         ["Minimum speech (seconds)"] = "最短音声時間（秒）",
         ["Maximum segment (seconds)"] = "最大セグメント時間（秒）",
-        ["Operation failed"] = "操作に失敗しました"
+        ["Operation failed"] = "操作に失敗しました",
+        ["Unable to save settings"] = "設定を保存できません",
+        ["Settings could not be saved. Unsaved changes will be discarded so the window can close."] = "設定を保存できませんでした。未保存の変更を破棄してウィンドウを閉じます。"
     };
 
     public static string Translate(string? languageSetting, string key)

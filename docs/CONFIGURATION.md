@@ -18,7 +18,7 @@ Provider model paths are global so multiple profiles can reuse one loaded model 
 
 `application.modelDownloadSource` accepts `official` or `hf-mirror` and defaults to `official` for existing configurations. The General page exposes both as source buttons. `hf-mirror` rewrites only Hugging Face resolve URLs to `https://hf-mirror.com`; GitHub release URLs remain unchanged, and every downloaded file still has to pass its catalog SHA-256 check.
 
-When `application.closeToTray` is `true`, closing the settings window keeps the native PTT/ASR service and tray icon running but disposes the WPF window. Opening settings from the tray creates a fresh window. Pending debounced configuration changes are saved before disposal; a validation or write failure keeps the window open.
+When `application.closeToTray` is `true`, closing the settings window keeps the native PTT/ASR service and tray icon running but disposes the WPF window. Opening settings from the tray creates a fresh window. Pending debounced configuration changes are saved before disposal. If validation or writing fails, the error is logged and a localized warning explains that the unsaved changes will be discarded; acknowledging the warning always allows the window or application to close.
 
 ## Profile selection
 

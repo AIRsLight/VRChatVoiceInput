@@ -19,6 +19,7 @@ namespace VRChatVoiceInput.App;
 
 public partial class NativeMainWindow : Window, ISettingsWindow
 {
+    private static readonly TimeSpan CloseSaveTimeout = TimeSpan.FromSeconds(5);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -30,6 +31,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
     private static readonly Brush WarningBrush = new SolidColorBrush(Color.FromRgb(0x9A, 0x5A, 0x00));
     private static readonly Brush DangerBrush = new SolidColorBrush(Color.FromRgb(0xB1, 0x3B, 0x32));
     private readonly RuntimeController _controller;
+    private readonly SemaphoreSlim _saveGate = new(1, 1);
     private readonly DispatcherTimer _saveTimer;
     private readonly DispatcherTimer _toastTimer;
     private readonly DispatcherTimer _diagnosticTimer;
@@ -47,6 +49,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
     private bool _allowClose;
     private bool _microphoneTestRunning;
     private Task<bool>? _closeTask;
+    private Exception? _lastSaveError;
     private Panel? _microphoneMeters;
     private TextBlock? _diagnosticMemoryText;
     private TextBlock? _diagnosticAverageText;
@@ -402,31 +405,60 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         await SaveNowAsync();
     }
 
-    private async Task SaveNowAsync()
+    private async Task<bool> SaveNowAsync(CancellationToken cancellationToken = default)
     {
         _saveTimer.Stop();
-        if (!_dirty || _saving)
-        {
-            return;
-        }
-
-        _saving = true;
-        UpdateTopbar();
         try
         {
-            _savingOwnConfiguration = true;
-            await _controller.SaveConfigurationAsync(_configuration.ToJsonString(JsonOptions));
-            _dirty = false;
+            await _saveGate.WaitAsync(cancellationToken);
         }
-        catch (Exception exception)
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
-            ShowError(exception);
+            _lastSaveError = new TimeoutException(
+                "Configuration saving did not finish before the window close timeout.",
+                exception);
+            AppFileLogger.Error("configuration", "Configuration save timed out while closing.", _lastSaveError);
+            return false;
+        }
+        try
+        {
+            if (!_dirty)
+            {
+                return true;
+            }
+
+            _saving = true;
+            UpdateTopbar();
+            try
+            {
+                _savingOwnConfiguration = true;
+                await _controller.SaveConfigurationAsync(
+                    _configuration.ToJsonString(JsonOptions),
+                    cancellationToken);
+                _dirty = false;
+                _lastSaveError = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                _lastSaveError = exception;
+                AppFileLogger.Error("configuration", "Automatic configuration save failed.", exception);
+                if (_closeTask is null)
+                {
+                    ShowToast($"{T("Unable to save settings")}: {exception.Message}", true);
+                }
+                return false;
+            }
+            finally
+            {
+                _savingOwnConfiguration = false;
+                _saving = false;
+                UpdateTopbar();
+            }
         }
         finally
         {
-            _savingOwnConfiguration = false;
-            _saving = false;
-            UpdateTopbar();
+            _saveGate.Release();
         }
     }
 
@@ -536,11 +568,28 @@ public partial class NativeMainWindow : Window, ISettingsWindow
 
     private async Task<bool> CloseAfterSavingCoreAsync()
     {
-        await SaveNowAsync();
-        if (_dirty)
+        using var saveTimeout = new CancellationTokenSource(CloseSaveTimeout);
+        var saved = await SaveNowAsync(saveTimeout.Token);
+        if (!saved && _dirty)
         {
-            _closeTask = null;
-            return false;
+            AppFileLogger.Warning(
+                "configuration",
+                "Closing the settings window after configuration save failed.",
+                _lastSaveError);
+            var message = T("Settings could not be saved. Unsaved changes will be discarded so the window can close.");
+            if (!string.IsNullOrWhiteSpace(_lastSaveError?.Message))
+            {
+                message += Environment.NewLine + Environment.NewLine + _lastSaveError.Message;
+            }
+            if (IsVisible)
+            {
+                System.Windows.MessageBox.Show(
+                    this,
+                    message,
+                    T("Unable to save settings"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
         }
 
         _allowClose = true;
