@@ -41,7 +41,7 @@ internal static class AppFileLogger
         {
         }
 
-        Info("application", $"Application starting. Version {typeof(AppFileLogger).Assembly.GetName().Version}.");
+        Info("application", $"Application starting. Version {ApplicationVersion.Current}.");
     }
 
     public static void Info(string source, string message) => Write("INFO", source, message);

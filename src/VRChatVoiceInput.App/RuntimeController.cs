@@ -274,7 +274,7 @@ public sealed class RuntimeController : IAsyncDisposable
             {
                 configurationPath = ConfigurationPath,
                 logFilePath = AppFileLogger.CurrentLogPath,
-                applicationVersion = typeof(RuntimeController).Assembly.GetName().Version?.ToString() ?? "0.0.0",
+                applicationVersion = ApplicationVersion.Current,
                 webViewVersion
             },
             microphones,

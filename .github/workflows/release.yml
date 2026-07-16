@@ -34,6 +34,17 @@ jobs:
         shell: pwsh
         run: ./fetch-openvr.ps1
 
+      - name: Validate tagged version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content -LiteralPath Directory.Build.props -Raw
+          $projectVersion = [string]$props.Project.PropertyGroup.VersionPrefix
+          $tagVersion = "${{ github.ref_name }}" -replace '^v', ''
+          if ($tagVersion -ne $projectVersion) {
+            throw "Release tag version '$tagVersion' does not match project version '$projectVersion'."
+          }
+
       - name: Build source-only portable package
         shell: pwsh
         run: >-
