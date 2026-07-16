@@ -47,6 +47,17 @@ public partial class NativeMainWindow
             T("Unsupported system languages fall back to English."),
             Field(T("Interface language"), language)));
 
+        content.Children.Add(Section(
+            T("Download source"),
+            T("HF Mirror is a third-party service. GitHub downloads keep their original source, and every file is still verified by SHA-256."),
+            SegmentedControl(
+                "application.modelDownloadSource",
+                [
+                    new Option("official", "Hugging Face"),
+                    new Option("hf-mirror", "HF Mirror")
+                ],
+                fallback: "official")));
+
         var microphones = GetMicrophones();
         var microphoneOptions = new List<Option>
         {

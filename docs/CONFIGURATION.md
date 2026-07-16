@@ -16,7 +16,7 @@ Provider model paths are global so multiple profiles can reuse one loaded model 
 
 `application.uiLanguage` accepts `auto`, `zh`, `ja`, or `en`. `auto` maps Chinese, Japanese, and English Windows UI cultures to the corresponding interface; every unsupported system language falls back to English. The General page allows this value to be changed manually. The WPF settings UI, message-box titles, and tray menu use the same setting.
 
-`application.modelDownloadSource` accepts `official` or `hf-mirror` and defaults to `official` for existing configurations. The Models page exposes both as source buttons. `hf-mirror` rewrites only Hugging Face resolve URLs to `https://hf-mirror.com`; GitHub release URLs remain unchanged, and every downloaded file still has to pass its catalog SHA-256 check.
+`application.modelDownloadSource` accepts `official` or `hf-mirror` and defaults to `official` for existing configurations. The General page exposes both as source buttons. `hf-mirror` rewrites only Hugging Face resolve URLs to `https://hf-mirror.com`; GitHub release URLs remain unchanged, and every downloaded file still has to pass its catalog SHA-256 check.
 
 When `application.closeToTray` is `true`, closing the settings window keeps the native PTT/ASR service and tray icon running but disposes the WPF window. Opening settings from the tray creates a fresh window. Pending debounced configuration changes are saved before disposal; a validation or write failure keeps the window open.
 
