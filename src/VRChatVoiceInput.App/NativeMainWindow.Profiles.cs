@@ -21,7 +21,7 @@ public partial class NativeMainWindow
         var sidebar = new DockPanel { Margin = new Thickness(12, 18, 12, 18) };
         var sidebarHeader = new DockPanel { LastChildFill = true, Margin = new Thickness(5, 0, 5, 12) };
         var sidebarActions = new StackPanel { Orientation = Orientation.Horizontal };
-        var automatic = IconButton("\uE72C", T("Resume automatic application routing"), async (_, _) =>
+        var automatic = IconButton(MaterialIconPaths.Refresh, T("Resume automatic application routing"), async (_, _) =>
         {
             await SaveNowAsync();
             if (_dirty) return;
@@ -39,7 +39,7 @@ public partial class NativeMainWindow
         automatic.IsEnabled = !string.IsNullOrWhiteSpace(_controller.ProfileOverride);
         automatic.Margin = new Thickness(0, 0, 6, 0);
         sidebarActions.Children.Add(automatic);
-        sidebarActions.Children.Add(IconButton("\uE710", T("Add profile"), OnAddProfile));
+        sidebarActions.Children.Add(IconButton(MaterialIconPaths.Plus, T("Add profile"), OnAddProfile));
         DockPanel.SetDock(sidebarActions, Dock.Right);
         sidebarHeader.Children.Add(sidebarActions);
         sidebarHeader.Children.Add(new TextBlock
@@ -186,12 +186,12 @@ public partial class NativeMainWindow
             {
                 ShowError(exception);
             }
-        }, true);
+        }, true, MaterialIconPaths.Play);
         var setDefault = ActionButton(T("Set default"), (_, _) =>
         {
             Set("profiles.defaultProfileId", profile["id"]?.GetValue<string>() ?? string.Empty);
             MarkDirty();
-        });
+        }, icon: MaterialIconPaths.Check);
         var runtime = new TextBlock
         {
             Text = string.IsNullOrWhiteSpace(_controller.ProfileOverride)
@@ -203,8 +203,8 @@ public partial class NativeMainWindow
             Margin = new Thickness(9, 0, 0, 0),
             TextTrimming = TextTrimming.CharacterEllipsis
         };
-        var duplicate = IconButton("\uE8C8", T("Duplicate profile"), OnDuplicateProfile);
-        var delete = IconButton("\uE74D", T("Delete profile"), OnDeleteProfile, true);
+        var duplicate = IconButton(MaterialIconPaths.ContentCopy, T("Duplicate profile"), OnDuplicateProfile);
+        var delete = IconButton(MaterialIconPaths.DeleteOutline, T("Delete profile"), OnDeleteProfile, true);
         delete.IsEnabled = profile["builtIn"]?.GetValue<bool>() != true;
         use.Margin = new Thickness(8, 0, 7, 0);
         setDefault.Margin = new Thickness(0, 0, 0, 0);
@@ -285,7 +285,7 @@ public partial class NativeMainWindow
             Text = ProfileSummary(profile),
             IsReadOnly = true
         };
-        var processButton = IconButton("\uE721", T("Choose processes"), (_, _) => OpenProcessPicker(profile));
+        var processButton = IconButton(MaterialIconPaths.FileSearchOutline, T("Choose processes"), (_, _) => OpenProcessPicker(profile));
         var processRow = new Grid();
         processRow.ColumnDefinitions.Add(new ColumnDefinition());
         processRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
@@ -305,10 +305,10 @@ public partial class NativeMainWindow
             $"{basePath}.input.mode",
             new[]
             {
-                new Option("keyboard", T("Keyboard"), "\uE765"),
-                new Option("mouse", T("Mouse"), "\uE962"),
-                new Option("xinput", T("Gamepad"), "\uE7FC"),
-                new Option("steamvr", T("SteamVR"), "\uE95B")
+                new Option("keyboard", T("Keyboard"), MaterialIconPaths.Keyboard),
+                new Option("mouse", T("Mouse"), MaterialIconPaths.Mouse),
+                new Option("xinput", T("Gamepad"), MaterialIconPaths.GamepadVariant),
+                new Option("steamvr", T("SteamVR"), MaterialIconPaths.Steam)
             });
         modeControl.Margin = new Thickness(0, 0, 0, 16);
         var triggerFields = new StackPanel();
@@ -387,12 +387,15 @@ public partial class NativeMainWindow
             var status = _controller.GetSteamVrStatus();
             stack.Children.Add(Notice(status.Message, !status.Connected));
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 9, 0, 0) };
-            var refresh = ActionButton(T("Refresh SteamVR"), (_, _) => BuildCurrentPage());
+            var refresh = ActionButton(
+                T("Refresh SteamVR"),
+                (_, _) => BuildCurrentPage(),
+                icon: MaterialIconPaths.Refresh);
             var bindings = ActionButton(T("Controller bindings"), async (_, _) =>
             {
                 try { await _controller.OpenSteamVrBindingsAsync(); }
                 catch (Exception exception) { ShowError(exception); }
-            });
+            }, icon: MaterialIconPaths.Steam);
             bindings.Margin = new Thickness(8, 0, 0, 0);
             buttons.Children.Add(refresh);
             buttons.Children.Add(bindings);
@@ -699,8 +702,8 @@ public partial class NativeMainWindow
         };
         var root = new DockPanel { Margin = new Thickness(18) };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-        var cancel = ActionButton("Cancel", (_, _) => dialog.DialogResult = false);
-        var apply = ActionButton("Apply", (_, _) => dialog.DialogResult = true, true);
+        var cancel = ActionButton(T("Cancel"), (_, _) => dialog.DialogResult = false, icon: MaterialIconPaths.Close);
+        var apply = ActionButton(T("Apply"), (_, _) => dialog.DialogResult = true, true, MaterialIconPaths.Check);
         apply.Margin = new Thickness(8, 0, 0, 0);
         buttons.Children.Add(cancel);
         buttons.Children.Add(apply);

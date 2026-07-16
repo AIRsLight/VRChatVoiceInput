@@ -1,34 +1,6 @@
-import {
-  Activity,
-  AudioLines,
-  Check,
-  ChevronDown,
-  CircleAlert,
-  CirclePlus,
-  Copy,
-  Cpu,
-  Download,
-  ExternalLink,
-  FileSearch,
-  FolderOpen,
-  Gamepad2,
-  Glasses,
-  Keyboard,
-  ListRestart,
-  Logs,
-  Mic,
-  Mouse,
-  Play,
-  RefreshCw,
-  Settings,
-  Square,
-  Trash2,
-  UserRoundCog,
-  X,
-  createIcons
-} from "lucide";
 import { resolveUiLocale, translate, type UiLocale } from "./i18n";
 import { gamepadButtonNames } from "./gamepad";
+import { materialIcon, type MaterialIconName } from "./materialIcons";
 import "./styles.css";
 
 interface ApplicationSettings {
@@ -311,35 +283,6 @@ type NativeLifecycleWindow = Window & {
 
 type ViewId = "general" | "profiles" | "models" | "diagnostics";
 type ProfileTab = "input" | "processing" | "output";
-
-const iconSet = {
-  Activity,
-  AudioLines,
-  Check,
-  ChevronDown,
-  CircleAlert,
-  CirclePlus,
-  Copy,
-  Cpu,
-  Download,
-  ExternalLink,
-  FileSearch,
-  FolderOpen,
-  Gamepad2,
-  Glasses,
-  Keyboard,
-  ListRestart,
-  Logs,
-  Mic,
-  Mouse,
-  Play,
-  RefreshCw,
-  Settings,
-  Square,
-  Trash2,
-  UserRoundCog,
-  X
-};
 
 const modelProviderIds: Record<string, string> = {
   paraformer: "paraformer-gguf",
@@ -760,15 +703,11 @@ function scheduleAutoSave(delay = 700): void {
   }, delay);
 }
 
-function icon(name: keyof typeof iconSet): string {
-  return `<i data-lucide="${name.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`).replace(/^-/, "")}"></i>`;
+function icon(name: MaterialIconName): string {
+  return materialIcon(name);
 }
 
-function refreshIcons(): void {
-  createIcons({ icons: iconSet });
-}
-
-function navButton(view: ViewId, label: string, iconName: keyof typeof iconSet): string {
+function navButton(view: ViewId, label: string, iconName: MaterialIconName): string {
   return `<button class="nav-button ${activeView === view ? "active" : ""}" data-view="${view}" title="${label}">
     ${icon(iconName)}<span>${label}</span>
   </button>`;
@@ -788,17 +727,17 @@ function render(): void {
   root.innerHTML = `<div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">${icon("AudioLines")}</div>
+        <div class="brand-mark">${icon("waveform")}</div>
         <div class="brand-copy">
           <div class="brand-title">${t("Voice Input")}</div>
           <div class="brand-subtitle">${t("VRChat companion")}</div>
         </div>
       </div>
       <nav class="nav">
-        ${navButton("general", t("General"), "Settings")}
-        ${navButton("profiles", t("Profiles"), "UserRoundCog")}
-        ${navButton("models", t("Models"), "Cpu")}
-        ${navButton("diagnostics", t("Diagnostics"), "Logs")}
+        ${navButton("general", t("General"), "cogOutline")}
+        ${navButton("profiles", t("Profiles"), "accountOutline")}
+        ${navButton("models", t("Models"), "memory")}
+        ${navButton("diagnostics", t("Diagnostics"), "chartBoxOutline")}
       </nav>
       <div class="sidebar-footer">
         <div>App ${escapeHtml(snapshot.environment.applicationVersion)}</div>
@@ -817,7 +756,6 @@ function render(): void {
   bindCommonEvents();
   bindViewEvents();
   bindProcessPickerEvents();
-  refreshIcons();
 }
 
 function updateTopbar(): void {
@@ -847,13 +785,12 @@ function updateTopbar(): void {
       <span class="status-dot"></span><span>${escapeHtml(runtimeLabel)}</span>
     </div>
     <div class="autosave-status ${saveInProgress ? "saving" : dirty ? "pending" : "saved"}">
-      ${icon(saveInProgress ? "RefreshCw" : "Check")}<span>${t(saveInProgress ? "Saving..." : dirty ? "Waiting to save" : "Saved")}</span>
+      ${icon(saveInProgress ? "refresh" : "check")}<span>${t(saveInProgress ? "Saving..." : dirty ? "Waiting to save" : "Saved")}</span>
     </div>
     <button class="icon-button" id="runtime-toggle" title="${t(running ? "Stop service" : "Start service")}" ${busy ? "disabled" : ""}>
-      ${icon(running ? "Square" : "Play")}
+      ${icon(running ? "stop" : "play")}
     </button>`;
   document.querySelector<HTMLButtonElement>("#runtime-toggle")?.addEventListener("click", toggleRuntime);
-  refreshIcons();
 }
 
 function renderView(): string {
@@ -947,7 +884,7 @@ function renderGeneral(): string {
           <div class="microphone-test-heading">
             <div><div class="field-label">${t("Microphone test")}</div><div class="field-help">${t("Shows live input from every active microphone.")}</div></div>
             <button class="button ${microphoneTestRunning ? "danger" : ""}" id="microphone-test-toggle">
-              ${icon(microphoneTestRunning ? "Square" : "Mic")}
+              ${icon(microphoneTestRunning ? "stop" : "microphone")}
               <span>${t(microphoneTestRunning ? "Stop test" : "Start test")}</span>
             </button>
           </div>
@@ -962,7 +899,7 @@ function renderGeneral(): string {
           <label for="configuration-path">${t("File")}</label>
           <div class="input-with-button">
             <input class="input" id="configuration-path" readonly value="${escapeHtml(snapshot!.environment.configurationPath)}" />
-            <button class="icon-button" id="reveal-config" title="${t("Show configuration file")}">${icon("FolderOpen")}</button>
+            <button class="icon-button" id="reveal-config" title="${t("Show configuration file")}">${icon("folderOpenOutline")}</button>
           </div>
         </div>
       </div>
@@ -1053,21 +990,21 @@ function renderProcessPicker(): string {
     <section class="modal process-picker" role="dialog" aria-modal="true" aria-labelledby="process-picker-title">
       <header class="modal-header">
         <div><h2 id="process-picker-title">${t("Choose target processes")}</h2><p>${t("Select one or more running applications for this profile.")}</p></div>
-        <button class="icon-button" id="process-picker-close" title="${t("Close")}">${icon("X")}</button>
+        <button class="icon-button" id="process-picker-close" title="${t("Close")}">${icon("close")}</button>
       </header>
       <div class="process-picker-toolbar">
         <input class="input" id="process-picker-search" placeholder="${t("Search processes")}" ${processPickerLoading ? "disabled" : ""} />
-        <button class="icon-button ${processPickerLoading ? "refreshing" : ""}" id="process-picker-refresh" title="${t("Refresh")}" ${processPickerLoading ? "disabled" : ""}>${icon("RefreshCw")}</button>
+        <button class="icon-button ${processPickerLoading ? "refreshing" : ""}" id="process-picker-refresh" title="${t("Refresh")}" ${processPickerLoading ? "disabled" : ""}>${icon("refresh")}</button>
       </div>
       <div class="process-list" id="process-picker-list">
         ${processPickerLoading ? `<div class="process-picker-state">${t("Loading running applications...")}</div>` : rows || `<div class="process-picker-state">${t("No running applications found")}</div>`}
         <div class="process-picker-state" id="process-picker-no-matches" hidden>${t("No matching processes")}</div>
       </div>
       <footer class="modal-footer">
-        <button class="button" id="process-picker-dynamic">${icon("Activity")}<span>${t("Use current foreground")}</span></button>
+        <button class="button" id="process-picker-dynamic">${icon("pulse")}<span>${t("Use current foreground")}</span></button>
         <span class="spacer"></span>
-        <button class="button" id="process-picker-cancel">${t("Cancel")}</button>
-        <button class="button primary" id="process-picker-apply" ${processPickerLoading ? "disabled" : ""}>${icon("Check")}<span>${t("Apply")}</span></button>
+        <button class="button" id="process-picker-cancel">${icon("close")}<span>${t("Cancel")}</span></button>
+        <button class="button primary" id="process-picker-apply" ${processPickerLoading ? "disabled" : ""}>${icon("check")}<span>${t("Apply")}</span></button>
       </footer>
     </section>
   </div>`;
@@ -1180,8 +1117,8 @@ function renderProfiles(): string {
   return `<div class="profile-layout">
     <aside class="profile-list-pane">
       <div class="profile-list-header"><span class="profile-list-title">${t("Profiles")}</span><span class="profile-list-actions">
-        <button class="icon-button" id="automatic-routing" title="${t("Resume automatic application routing")}" ${runtimeProfileId ? "" : "disabled"}>${icon("ListRestart")}</button>
-        <button class="icon-button" id="add-profile" title="${t("Add profile")}">${icon("CirclePlus")}</button></span>
+        <button class="icon-button" id="automatic-routing" title="${t("Resume automatic application routing")}" ${runtimeProfileId ? "" : "disabled"}>${icon("refresh")}</button>
+        <button class="icon-button" id="add-profile" title="${t("Add profile")}">${icon("plus")}</button></span>
       </div>
       <div class="profile-list">${profileItems}</div>
     </aside>
@@ -1189,12 +1126,12 @@ function renderProfiles(): string {
       <div class="profile-editor-inner">
         <div class="editor-toolbar">
           <label class="toggle" title="${t("Enable profile")}"><input type="checkbox" data-config-path="${base}.enabled" ${profile.enabled ? "checked" : ""} /><span class="toggle-track"></span></label>
-          <button class="button primary" id="use-profile" title="${t(dirty ? "Save changes before activating this profile" : "Activate this profile in the runtime")}" ${profile.id === runtimeProfileId || !profile.enabled || !recognitionReady || dirty ? "disabled" : ""}>${icon("Play")}<span>${t("Use profile")}</span></button>
-          <button class="button" id="set-default" ${profile.id === config.profiles.defaultProfileId ? "disabled" : ""}>${icon("Check")}<span>${t("Set default")}</span></button>
+          <button class="button primary" id="use-profile" title="${t(dirty ? "Save changes before activating this profile" : "Activate this profile in the runtime")}" ${profile.id === runtimeProfileId || !profile.enabled || !recognitionReady || dirty ? "disabled" : ""}>${icon("play")}<span>${t("Use profile")}</span></button>
+          <button class="button" id="set-default" ${profile.id === config.profiles.defaultProfileId ? "disabled" : ""}>${icon("check")}<span>${t("Set default")}</span></button>
           <span class="routing-label">${runtimeProfileId ? t("Runtime: {profile}", { profile: runtimeProfileId }) : t("Runtime: automatic")}</span>
           <span class="spacer"></span>
-          <button class="icon-button" id="duplicate-profile" title="${t("Duplicate profile")}">${icon("Copy")}</button>
-          <button class="icon-button danger" id="delete-profile" title="${t("Delete profile")}" ${profile.builtIn ? "disabled" : ""}>${icon("Trash2")}</button>
+          <button class="icon-button" id="duplicate-profile" title="${t("Duplicate profile")}">${icon("contentCopy")}</button>
+          <button class="icon-button danger" id="delete-profile" title="${t("Delete profile")}" ${profile.builtIn ? "disabled" : ""}>${icon("deleteOutline")}</button>
         </div>
         <div class="profile-tabs" role="tablist">
           <button class="profile-tab ${activeProfileTab === "input" ? "active" : ""}" data-profile-tab="input">${t("Input")}</button>
@@ -1220,7 +1157,7 @@ function renderProfileIdentity(profile: Profile): string {
         <label>${t("Process names")}</label>
         <div class="input-with-button">
           <input class="input" readonly value="${escapeHtml(profileSummary(profile))}" />
-          <button class="icon-button" id="open-process-picker" title="${t("Choose processes")}">${icon("FileSearch")}</button>
+          <button class="icon-button" id="open-process-picker" title="${t("Choose processes")}">${icon("fileSearchOutline")}</button>
         </div>
         <div class="field-help">${t("Leave empty to use the application that is in the foreground when PTT is pressed.")}</div>
       </div>
@@ -1246,22 +1183,22 @@ function renderProfileInput(profile: Profile, base: string): string {
     <div><h2 class="section-title">${t("Push to talk")}</h2><div class="section-meta">${t("Trigger binding")}</div></div>
     <div class="field-stack">
       <div class="segmented" data-segment-path="${base}.input.mode">
-        ${segment("keyboard", profile.input.mode, `${icon("Keyboard")}<span>${t("Keyboard")}</span>`)}
-        ${segment("mouse", profile.input.mode, `${icon("Mouse")}<span>${t("Mouse")}</span>`)}
-        ${segment("xinput", profile.input.mode, `${icon("Gamepad2")}<span>${t("Gamepad")}</span>`)}
-        ${segment("steamvr", profile.input.mode, `${icon("Glasses")}<span>SteamVR</span>`)}
+        ${segment("keyboard", profile.input.mode, `${icon("keyboard")}<span>${t("Keyboard")}</span>`)}
+        ${segment("mouse", profile.input.mode, `${icon("mouse")}<span>${t("Mouse")}</span>`)}
+        ${segment("xinput", profile.input.mode, `${icon("gamepadVariant")}<span>${t("Gamepad")}</span>`)}
+        ${segment("steamvr", profile.input.mode, `${icon("steam")}<span>SteamVR</span>`)}
       </div>
       ${profile.input.mode === "keyboard" ? `<div class="field-row">
         <div class="field"><label>${t("Trigger keys")}</label><div class="input-with-button">
           <input class="input" readonly value="${escapeHtml(keyboardCapturePath === keyboardPath ? t("Waiting for keys...") : formatKeys(keyboardKeys))}" />
-          <button class="icon-button" data-capture-path="${keyboardPath}" title="${t("Capture keyboard chord")}" ${inputCaptureActive ? "disabled" : ""}>${icon("Keyboard")}</button>
+          <button class="icon-button" data-capture-path="${keyboardPath}" title="${t("Capture keyboard chord")}" ${inputCaptureActive ? "disabled" : ""}>${icon("keyboard")}</button>
         </div></div>
         <div class="field">${toggleControl(`${base}.input.keyboard.suppressKey`, profile.input.keyboard.suppressKey, t("Suppress trigger keys"))}</div>
       </div>` : ""}
       ${profile.input.mode === "mouse" ? `<div class="field-row">
         <div class="field"><label>${t("Trigger button")}</label><div class="input-with-button">
           <input class="input" readonly value="${escapeHtml(mouseCaptureProfileId === profile.id ? t("Waiting for mouse button...") : formatMouseButton(profile.input.mouse.button))}" />
-          <button class="icon-button" id="capture-mouse-button" title="${t("Capture mouse button")}" ${inputCaptureActive ? "disabled" : ""}>${icon("Mouse")}</button>
+          <button class="icon-button" id="capture-mouse-button" title="${t("Capture mouse button")}" ${inputCaptureActive ? "disabled" : ""}>${icon("mouse")}</button>
         </div></div>
         <div class="field">${toggleControl(`${base}.input.mouse.suppressButton`, profile.input.mouse.suppressButton, t("Suppress trigger button"))}</div>
       </div>` : ""}
@@ -1269,7 +1206,7 @@ function renderProfileInput(profile: Profile, base: string): string {
         <div class="field"><label>${t("Controller")}</label><input class="input" readonly value="${escapeHtml(t("XInput controller {number}", { number: profile.input.gamepad.userIndex + 1 }))}" /><div class="field-help">${t("The controller is detected automatically when binding.")}</div></div>
         <div class="field"><label>${t("Trigger button")}</label><div class="input-with-button">
           <input class="input" readonly value="${escapeHtml(gamepadCaptureProfileId === profile.id ? t("Waiting for button...") : formatGamepadButtons(profile.input.gamepad.buttonMask))}" />
-          <button class="icon-button" id="capture-gamepad-button" title="${t("Capture gamepad button")}" ${inputCaptureActive ? "disabled" : ""}>${icon("Gamepad2")}</button>
+          <button class="icon-button" id="capture-gamepad-button" title="${t("Capture gamepad button")}" ${inputCaptureActive ? "disabled" : ""}>${icon("gamepadVariant")}</button>
         </div></div>
       </div>` : ""}
       ${profile.input.mode === "steamvr" ? `<div class="field-stack">
@@ -1278,8 +1215,8 @@ function renderProfileInput(profile: Profile, base: string): string {
           <div class="field"><label>${t("Poll interval (ms)")}</label><input class="input" type="number" min="1" max="1000" data-number="true" data-config-path="${base}.input.steamVr.pollIntervalMs" value="${profile.input.steamVr.pollIntervalMs}" /></div>
         </div>
         <div class="steamvr-actions">
-          <button class="button" id="open-steamvr-bindings">${icon("Glasses")}<span>${t("Controller bindings")}</span></button>
-          <button class="icon-button" id="refresh-steamvr-status" title="${t("Refresh SteamVR status")}">${icon("RefreshCw")}</button>
+          <button class="button" id="open-steamvr-bindings">${icon("steam")}<span>${t("Controller bindings")}</span></button>
+          <button class="icon-button" id="refresh-steamvr-status" title="${t("Refresh SteamVR status")}">${icon("refresh")}</button>
         </div>
         <div class="steamvr-status ${steamVr.connected ? "connected" : "disconnected"}">
           <span class="steamvr-status-dot"></span>
@@ -1313,7 +1250,7 @@ function renderProfileAudio(profile: Profile, base: string): string {
         </select></div>
         <div class="field"><label>${t("Minimum recording (ms)")}</label><input class="input" type="number" min="100" max="5000" placeholder="${t("Global: {value}", { value: configuration!.audio.minimumDurationMs })}" data-config-path="${base}.audio.minimumDurationMs" data-number="true" data-nullable="true" value="${profile.audio.minimumDurationMs ?? ""}" /></div>
       </div>
-      ${selectedDeviceId && !selectedDeviceExists ? `<div class="notice">${icon("CircleAlert")}<span>${t("The selected microphone is not currently connected.")}</span></div>` : ""}
+      ${selectedDeviceId && !selectedDeviceExists ? `<div class="notice">${icon("alertCircleOutline")}<span>${t("The selected microphone is not currently connected.")}</span></div>` : ""}
     </div>
   </section>`;
 }
@@ -1332,26 +1269,26 @@ function renderProfileRecognition(profile: Profile, base: string): string {
           ${[["auto", t("Auto detect")], ["zh", t("Chinese")], ["en", t("English")], ["ja", t("Japanese")], ["ko", t("Korean")]].map(([value, label]) => `<option value="${value}" ${profile.recognition.language === value ? "selected" : ""}>${label}</option>`).join("")}
         </select></div>
       </div>
-      ${currentStatus.available ? "" : `<div class="notice">${icon("CircleAlert")}<span>${escapeHtml(t("Required files missing: {files}", { files: currentStatus.missingFiles.join(", ") }))}</span></div>`}
+      ${currentStatus.available ? "" : `<div class="notice">${icon("alertCircleOutline")}<span>${escapeHtml(t("Required files missing: {files}", { files: currentStatus.missingFiles.join(", ") }))}</span></div>`}
       ${toggleControl(
         `${base}.recognition.streamingEnabled`,
         profile.recognition.streamingEnabled,
         t("Stream recognition while recording"),
         !currentStatus.supportsStreaming)}
       ${profile.recognition.streamingEnabled && !currentStatus.streamingAvailable
-        ? `<div class="notice">${icon("CircleAlert")}<span>${escapeHtml(t("Streaming files missing: {files}", { files: currentStatus.streamingMissingFiles.join(", ") }))}</span></div>`
+        ? `<div class="notice">${icon("alertCircleOutline")}<span>${escapeHtml(t("Streaming files missing: {files}", { files: currentStatus.streamingMissingFiles.join(", ") }))}</span></div>`
         : ""}
       ${profile.recognition.streamingEnabled
-        ? `<div class="notice">${icon("AudioLines")}<span>${t(streamsToOsc
+        ? `<div class="notice">${icon("waveform")}<span>${t(streamsToOsc
           ? "Each completed speech segment updates the VRChat Chatbox; the final update enables its notification sound."
           : "Speech is recognized in segments while recording, then joined and sent once when PTT is released.")}</span></div>`
         : ""}
       ${profile.recognition.streamingEnabled &&
         !["qwen3-asr", "sensevoice-gguf", "paraformer-gguf"].includes(profile.recognition.provider)
-        ? `<div class="notice">${icon("CircleAlert")}<span>${t("This provider starts an external process for every speech segment and may have higher latency.")}</span></div>`
+        ? `<div class="notice">${icon("alertCircleOutline")}<span>${t("This provider starts an external process for every speech segment and may have higher latency.")}</span></div>`
         : ""}
       <div class="field"><label>${t("Hotwords")}</label><textarea class="textarea" data-array-path="${base}.recognition.hotwords" ${currentStatus.supportsTerminologyHints ? "" : "disabled"}>${escapeHtml(profile.recognition.hotwords.join("\n"))}</textarea></div>
-      ${currentStatus.supportsTerminologyHints ? "" : `<div class="notice">${icon("CircleAlert")}<span>${t("Hotwords are unavailable for {provider}. Existing entries are retained but inactive.", { provider: profile.recognition.provider })}</span></div>`}
+      ${currentStatus.supportsTerminologyHints ? "" : `<div class="notice">${icon("alertCircleOutline")}<span>${t("Hotwords are unavailable for {provider}. Existing entries are retained but inactive.", { provider: profile.recognition.provider })}</span></div>`}
     </div>
   </section>`;
 }
@@ -1377,7 +1314,7 @@ function renderProfileOutput(profile: Profile, base: string): string {
           ${openInput.mode === "hotkey" ? `<div class="field-row">
             <div class="field"><label>${t("Open keys")}</label><div class="input-with-button">
               <input class="input" readonly value="${escapeHtml(keyboardCapturePath === openInputPath ? t("Waiting for keys...") : formatKeys(openInput.virtualKeys))}" />
-              <button class="icon-button" data-capture-path="${openInputPath}" title="${t("Capture open-input chord")}" ${keyboardCapturePath ? "disabled" : ""}>${icon("Keyboard")}</button>
+              <button class="icon-button" data-capture-path="${openInputPath}" title="${t("Capture open-input chord")}" ${keyboardCapturePath ? "disabled" : ""}>${icon("keyboard")}</button>
             </div></div>
             <div class="field"><label>${t("Open delay (ms)")}</label><input class="input" type="number" min="0" max="5000" data-number="true" data-config-path="${base}.output.windows.openInputDelayMs" value="${output.windows.openInputDelayMs}" /></div>
           </div>` : ""}
@@ -1396,7 +1333,7 @@ function renderProfileOutput(profile: Profile, base: string): string {
           </div></div>
           ${submission.mode === "hotkey" ? `<div class="field"><label>${t("Submit keys")}</label><div class="input-with-button">
             <input class="input" readonly value="${escapeHtml(keyboardCapturePath === submissionPath ? t("Waiting for keys...") : formatKeys(submission.virtualKeys))}" />
-            <button class="icon-button" data-capture-path="${submissionPath}" title="${t("Capture submission chord")}" ${keyboardCapturePath ? "disabled" : ""}>${icon("Keyboard")}</button>
+            <button class="icon-button" data-capture-path="${submissionPath}" title="${t("Capture submission chord")}" ${keyboardCapturePath ? "disabled" : ""}>${icon("keyboard")}</button>
           </div></div>` : ""}
         </div>
       </div>` : `<div class="field-stack">
@@ -1429,7 +1366,7 @@ function renderModels(): string {
       `<button class="model-tab ${selectedModel === id ? "active" : ""} ${isAnyModelCombinationAvailable(id) ? "available" : "missing"}" data-model-tab="${id}"><span class="model-status-dot"></span>${label}</button>`).join("")}</div>
     ${renderModelDownloadProgress(providerId)}
     <div class="availability-bar ${modelAvailable ? "available" : "missing"}">
-      ${icon(modelAvailable ? "Check" : "CircleAlert")}
+      ${icon(modelAvailable ? "check" : "alertCircleOutline")}
       <span>${modelAvailable ? `${escapeHtml(status.id)} ${t("installed and available")}.` : escapeHtml(t("Missing files: {files}", { files: status.missingFiles.join(", ") }))}</span>
     </div>
     ${renderModelVariantSelection(selectedModel)}
@@ -1458,7 +1395,7 @@ function isAnyModelCombinationAvailable(model: string): boolean {
 
 function renderAdvancedModelConfiguration(model: string): string {
   return `<details class="model-advanced" ${advancedModelConfigurationOpen ? "open" : ""}>
-    <summary><strong>${t("Advanced model configuration")}</strong><span class="model-advanced-description">${t("Manual paths, numeric parameters, and streaming thresholds.")}</span><span class="model-advanced-chevron">${icon("ChevronDown")}</span></summary>
+    <summary><strong>${t("Advanced model configuration")}</strong><span class="model-advanced-description">${t("Manual paths, numeric parameters, and streaming thresholds.")}</span><span class="model-advanced-chevron">${icon("chevronDown")}</span></summary>
     <div class="model-advanced-content">
       ${renderModelSettings(model)}
       ${renderStreamingModelSettings()}
@@ -1550,8 +1487,8 @@ function renderModelVariantSelection(model: string): string {
       ${selectedId === "custom"
         ? `<span class="model-asset-status installed">${t("Custom path")}</span>`
         : selectedAsset?.installed
-          ? `<span class="model-asset-status installed">${icon("Check")} ${t("Installed and active")}</span>`
-          : `<button class="button" data-download-model-variant="${escapeHtml(selectedId)}" ${anyDownloadActive ? "disabled" : ""}>${icon("Download")}<span>${t("Download and use")}</span></button>`}
+          ? `<span class="model-asset-status installed">${icon("check")} ${t("Installed and active")}</span>`
+          : `<button class="button" data-download-model-variant="${escapeHtml(selectedId)}" ${anyDownloadActive ? "disabled" : ""}>${icon("download")}<span>${t("Download and use")}</span></button>`}
     </div>
   </section>`;
 }
@@ -1649,7 +1586,7 @@ function renderModelCapabilities(model: string, providerId: string): string {
       && configuration!.asr.paraformer.usePunctuation
       && !selectedAsset?.installed;
     const description = punctuationMissing
-      ? `<span class="model-capability-warning">${icon("CircleAlert")}<span>${t("Punctuation is enabled but its model is missing. Install this capability to make Paraformer available.")}</span></span>`
+      ? `<span class="model-capability-warning">${icon("alertCircleOutline")}<span>${t("Punctuation is enabled but its model is missing. Install this capability to make Paraformer available.")}</span></span>`
       : `<span>${descriptions[componentId] ?? ""}</span>`;
     const status = isCustom
       ? t("Custom path")
@@ -1669,10 +1606,10 @@ function renderModelCapabilities(model: string, providerId: string): string {
     const action = isCustom
       ? `<span class="capability-action-placeholder" aria-hidden="true"></span>`
       : selectedAsset?.updateAvailable
-        ? `<button class="icon-button" data-download-asset="${escapeHtml(selectedAsset.id)}" title="${t("Update runtime")}" ${anyDownloadActive ? "disabled" : ""}>${icon("Download")}</button>`
+        ? `<button class="icon-button" data-download-asset="${escapeHtml(selectedAsset.id)}" title="${t("Update runtime")}" ${anyDownloadActive ? "disabled" : ""}>${icon("download")}</button>`
       : selectedAsset?.installed
-        ? `<span class="capability-ready">${icon("Check")}</span>`
-        : `<button class="icon-button" data-download-asset="${escapeHtml(selectedAsset?.id ?? "")}" title="${t("Install capability")}" ${anyDownloadActive ? "disabled" : ""}>${icon("Download")}</button>`;
+        ? `<span class="capability-ready">${icon("check")}</span>`
+        : `<button class="icon-button" data-download-asset="${escapeHtml(selectedAsset?.id ?? "")}" title="${t("Install capability")}" ${anyDownloadActive ? "disabled" : ""}>${icon("download")}</button>`;
 
     return `<div class="model-capability-row">
       <div class="model-capability-name"><div class="model-capability-title"><strong>${componentLabels[componentId] ?? escapeHtml(componentId)}</strong>${variantControl}</div>${description}</div>
@@ -1687,12 +1624,12 @@ function renderModelCapabilities(model: string, providerId: string): string {
   const senseVoiceOptions = model === "senseVoice" ? `<div class="model-capability-options">
     ${toggleControl("asr.senseVoice.backend", configuration!.asr.senseVoice.backend === "vulkan", t("Use GPU"), false, "vulkan", "cpu")}
     ${gpuDeviceSelect(configuration!.asr.senseVoice.vulkanDeviceIndex, configuration!.asr.senseVoice.backend !== "vulkan", "sensevoice")}
-    <div class="notice">${icon("CircleAlert")}<span>${t("Vulkan performance may be faster or slower depending on the device, but an integrated GPU can be used to reduce CPU load.")}</span></div>
+    <div class="notice">${icon("alertCircleOutline")}<span>${t("Vulkan performance may be faster or slower depending on the device, but an integrated GPU can be used to reduce CPU load.")}</span></div>
   </div>` : "";
   const nanoOptions = model === "funAsrNano" ? `<div class="model-capability-options">
     ${toggleControl("asr.funAsrNano.backend", configuration!.asr.funAsrNano.backend === "vulkan", t("Use GPU"), false, "vulkan", "cpu")}
     ${gpuDeviceSelect(configuration!.asr.funAsrNano.vulkanDeviceIndex, configuration!.asr.funAsrNano.backend !== "vulkan", "funasr-nano")}
-    <div class="notice">${icon("CircleAlert")}<span>${t("Nano Vulkan can reduce CPU load but may be slower and reserve about 2 GiB of GPU or shared memory.")}</span></div>
+    <div class="notice">${icon("alertCircleOutline")}<span>${t("Nano Vulkan can reduce CPU load but may be slower and reserve about 2 GiB of GPU or shared memory.")}</span></div>
   </div>` : "";
   const whisperOptions = model === "whisperCpp" ? `<div class="model-capability-options">
     ${toggleControl("asr.whisperCpp.useGpu", configuration!.asr.whisperCpp.useGpu, t("Use GPU"))}
@@ -1759,11 +1696,12 @@ function renderModelFacts(model: string): string {
     }
   };
   const fact = facts[model];
+  const throughputToolTip = escapeHtml(t("Measured on an Intel Core i7-14700KF system with 64 GB RAM."));
   return `<div class="model-facts">
     <div class="model-fact"><span>${t("Languages")}</span><strong>${fact.languages}</strong></div>
     <div class="model-fact"><span>${t("Model files")}</span><strong>${fact.files}</strong></div>
     <div class="model-fact"><span>${t("Estimated peak RAM")}</span><strong>${fact.ram}</strong></div>
-    <div class="model-fact"><span>${t("Tested throughput")}</span><strong>${fact.throughput}</strong></div>
+    <div class="model-fact" title="${throughputToolTip}"><span class="model-fact-label">${t("Tested throughput")}${icon("informationOutline")}</span><strong>${fact.throughput}</strong></div>
     <div class="model-fact wide"><span>${t("Best suited for")}</span><strong>${fact.bestFor}</strong></div>
     <div class="model-facts-note">${t("Memory figures are previous local peak measurements. Throughput is the mean of three resident CPU runs on an 8-second mixed-language clip using an i7-14700KF; whitespace is excluded and actual results vary by hardware, audio, and text.")}</div>
   </div>`;
@@ -1781,7 +1719,7 @@ function renderModelDownloadProgress(providerId: string): string {
     : t("Official pinned files are downloaded from release sources and verified with SHA-256.");
   return `<div class="model-download">
     <div class="model-download-actions">
-      <button class="icon-button" id="cancel-model-download" title="${t("Cancel download")}">${icon("X")}</button>
+      <button class="icon-button" id="cancel-model-download" title="${t("Cancel download")}">${icon("close")}</button>
       <span class="model-download-detail">${detail}</span>
     </div>
     ${progress ? `<div class="download-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}"><span style="width:${percentage}%"></span></div>` : ""}
@@ -1810,7 +1748,7 @@ function formatBytes(bytes: number): string {
 function pathField(label: string, path: string, value: string | null, kind: "executable" | "model" | "folder"): string {
   return `<div class="field"><label>${label}</label><div class="input-with-button">
     <input class="input" data-config-path="${path}" data-nullable="true" value="${escapeHtml(value ?? "")}" />
-    <button class="icon-button" data-browse-path="${path}" data-browse-kind="${kind}" title="${t("Choose file")}">${icon("FolderOpen")}</button>
+    <button class="icon-button" data-browse-path="${path}" data-browse-kind="${kind}" title="${t("Choose file")}">${icon("folderOpenOutline")}</button>
   </div></div>`;
 }
 
@@ -1829,7 +1767,7 @@ function gpuDeviceSelect(selectedIndex: number | null, disabled: boolean, target
 
   return `<div class="field"><label>${t("GPU device")}</label><div class="input-with-button">
     <select class="select" data-gpu-target="${target}" ${disabled || snapshot!.gpuDevices.length === 0 ? "disabled" : ""}>${unavailableOption}${options}</select>
-    <button class="icon-button" data-refresh-gpu title="${t("Refresh GPU devices")}">${icon("RefreshCw")}</button>
+    <button class="icon-button" data-refresh-gpu title="${t("Refresh GPU devices")}">${icon("refresh")}</button>
   </div></div>`;
 }
 
@@ -1845,7 +1783,7 @@ function renderStreamingModelSettings(): string {
       <div class="field"><label>${t("Maximum segment (seconds)")}</label><input class="input" type="number" min="1" max="60" step="1" data-number="true" data-config-path="asr.streaming.maximumSegmentSeconds" value="${streaming.maximumSegmentSeconds}" /></div>
     </div>
     ${pathField(t("Silero VAD model"), "asr.streaming.sileroVadModelPath", streaming.sileroVadModelPath, "model")}
-    <div class="notice">${icon("CircleAlert")}<span>${t("Streaming recognition is enabled separately for each preset. OSC can show completed segments; other outputs receive only joined final text.")}</span></div>
+    <div class="notice">${icon("alertCircleOutline")}<span>${t("Streaming recognition is enabled separately for each preset. OSC can show completed segments; other outputs receive only joined final text.")}</span></div>
   </div></section>`;
 }
 
@@ -1948,7 +1886,7 @@ function renderDiagnostics(): string {
           <div class="field"><label>${t("Message")}</label><input class="input" id="output-test-message" value="VRChat Voice Input test" /></div>
         </div>
         ${requiresTarget ? `<div class="field"><label>${t("Target application")}</label><select class="select" id="output-test-target" ${applications.length === 0 ? "disabled" : ""}>${applicationOptions || `<option>${t("No running applications found")}</option>`}</select></div>` : ""}
-        <div><button class="button" id="output-test" ${profiles.length === 0 || (requiresTarget && applications.length === 0) ? "disabled" : ""}>${icon("Activity")}<span>${t("Send test")}</span></button></div>
+        <div><button class="button" id="output-test" ${profiles.length === 0 || (requiresTarget && applications.length === 0) ? "disabled" : ""}>${icon("send")}<span>${t("Send test")}</span></button></div>
       </div>
     </section>
     <section class="settings-section">
@@ -1956,11 +1894,11 @@ function renderDiagnostics(): string {
       <div class="field-stack">
         <div class="field"><label>${t("Log file")}</label><div class="input-with-button">
           <input class="input" readonly value="${escapeHtml(snapshot!.environment.logFilePath)}" />
-          <button class="icon-button" id="open-log-location" title="${t("Open log file location")}">${icon("FolderOpen")}</button>
+          <button class="icon-button" id="open-log-location" title="${t("Open log file location")}">${icon("folderOpenOutline")}</button>
         </div></div>
       </div>
     </section>
-    <div class="log-toolbar"><h2>${t("Runtime log")}</h2><button class="icon-button" id="refresh-snapshot" title="${t("Refresh")}">${icon("RefreshCw")}</button><button class="icon-button" id="clear-logs" title="${t("Clear view")}">${icon("Trash2")}</button></div>
+    <div class="log-toolbar"><h2>${t("Runtime log")}</h2><button class="icon-button" id="refresh-snapshot" title="${t("Refresh")}">${icon("refresh")}</button><button class="icon-button" id="clear-logs" title="${t("Clear view")}">${icon("deleteOutline")}</button></div>
     <div class="log-view" id="log-view">${logEntries}</div>
   </div>`;
 }
@@ -2720,9 +2658,8 @@ function showToast(message: string, error = false): void {
   if (!region) return;
   const toast = document.createElement("div");
   toast.className = `toast ${error ? "error" : ""}`;
-  toast.innerHTML = `${icon(error ? "CircleAlert" : "Check")}<span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `${icon(error ? "alertCircleOutline" : "check")}<span>${escapeHtml(message)}</span>`;
   region.appendChild(toast);
-  refreshIcons();
   window.setTimeout(() => toast.remove(), 3200);
 }
 

@@ -76,7 +76,8 @@ public partial class NativeMainWindow
         var microphoneTestButton = ActionButton(
             T(_microphoneTestRunning ? "Stop test" : "Start test"),
             OnMicrophoneTestToggle,
-            _microphoneTestRunning);
+            _microphoneTestRunning,
+            _microphoneTestRunning ? MaterialIconPaths.Stop : MaterialIconPaths.Microphone);
         var testHeader = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 4, 0, 10) };
         var testTitle = new TextBlock
         {
@@ -114,16 +115,10 @@ public partial class NativeMainWindow
             _microphoneMeters));
 
         var path = new TextBox { Text = _controller.ConfigurationPath, IsReadOnly = true };
-        var reveal = new Button
-        {
-            Width = 34,
-            Height = 34,
-            Padding = new Thickness(0),
-            Style = (Style)FindResource("ActionButtonStyle"),
-            ToolTip = T("Show configuration file"),
-            Content = new TextBlock { Text = "\uE8B7", FontFamily = new FontFamily("Segoe Fluent Icons"), FontSize = 14 }
-        };
-        reveal.Click += (_, _) => RevealPath(_controller.ConfigurationPath);
+        var reveal = IconButton(
+            MaterialIconPaths.FolderOpenOutline,
+            T("Show configuration file"),
+            (_, _) => RevealPath(_controller.ConfigurationPath));
         var pathRow = new Grid();
         pathRow.ColumnDefinitions.Add(new ColumnDefinition());
         pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });

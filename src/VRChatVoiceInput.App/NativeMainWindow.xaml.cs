@@ -29,7 +29,6 @@ public partial class NativeMainWindow : Window, ISettingsWindow
     private static readonly Brush SuccessBrush = new SolidColorBrush(Color.FromRgb(0x14, 0x76, 0x5D));
     private static readonly Brush WarningBrush = new SolidColorBrush(Color.FromRgb(0x9A, 0x5A, 0x00));
     private static readonly Brush DangerBrush = new SolidColorBrush(Color.FromRgb(0xB1, 0x3B, 0x32));
-
     private readonly RuntimeController _controller;
     private readonly DispatcherTimer _saveTimer;
     private readonly DispatcherTimer _toastTimer;
@@ -191,7 +190,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         RuntimeDot.Fill = running ? SuccessBrush : new SolidColorBrush(Color.FromRgb(0x9D, 0xA5, 0x9F));
         var profile = _controller.ProfileOverride ?? T("Automatic");
         RuntimeStatusText.Text = $"{T(running ? "Running" : "Stopped")} · {profile}";
-        RuntimeToggleGlyph.Text = running ? "\uE71A" : "\uE768";
+        RuntimeToggleIcon.Data = running ? MaterialIconPaths.Stop : MaterialIconPaths.Play;
         RuntimeToggleButton.ToolTip = NativeLocalization.Translate(
             GetString("application.uiLanguage", "auto"),
             running ? "Stop service" : "Start service");
@@ -377,7 +376,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         }
 
         _allowClose = true;
-        Close();
+        await Dispatcher.InvokeAsync(Close, DispatcherPriority.Background);
         return true;
     }
 
@@ -512,33 +511,85 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return grid;
     }
 
-    private Button ActionButton(string text, RoutedEventHandler handler, bool primary = false)
+    private Button ActionButton(
+        string text,
+        RoutedEventHandler handler,
+        bool primary = false,
+        Geometry? icon = null)
     {
         var button = new Button
         {
-            Content = text,
+            Content = icon is null ? text : IconLabel(icon, text),
             Style = (Style)FindResource(primary ? "PrimaryButtonStyle" : "ActionButtonStyle")
         };
         button.Click += handler;
         return button;
     }
 
-    private Button IconButton(string glyph, string toolTip, RoutedEventHandler handler, bool danger = false)
+    private Button IconButton(Geometry icon, string toolTip, RoutedEventHandler handler, bool danger = false)
     {
         var button = new Button
         {
             Style = (Style)FindResource("IconButtonStyle"),
             ToolTip = toolTip,
             Foreground = danger ? DangerBrush : new SolidColorBrush(Color.FromRgb(0x20, 0x26, 0x22)),
-            Content = new TextBlock
-            {
-                Text = glyph,
-                FontFamily = new FontFamily("Segoe Fluent Icons"),
-                FontSize = 14
-            }
+            Content = MaterialIcon(icon, 16)
         };
         button.Click += handler;
         return button;
+    }
+
+    private static StackPanel IconLabel(Geometry icon, string text)
+    {
+        var content = new StackPanel { Orientation = Orientation.Horizontal };
+        content.Children.Add(MaterialIcon(icon, 16, margin: new Thickness(0, 0, 7, 0)));
+        var label = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center };
+        label.SetBinding(
+            TextBlock.ForegroundProperty,
+            new System.Windows.Data.Binding(nameof(Foreground))
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(
+                    System.Windows.Data.RelativeSourceMode.FindAncestor,
+                    typeof(Button),
+                    1)
+            });
+        content.Children.Add(label);
+        return content;
+    }
+
+    private static System.Windows.Shapes.Path MaterialIcon(
+        Geometry icon,
+        double size = 16,
+        Brush? fill = null,
+        Thickness? margin = null)
+    {
+        var path = new System.Windows.Shapes.Path
+        {
+            Data = icon,
+            Width = size,
+            Height = size,
+            Stretch = Stretch.Uniform,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = margin ?? new Thickness(0)
+        };
+        if (fill is not null)
+        {
+            path.Fill = fill;
+        }
+        else
+        {
+            path.SetBinding(
+                System.Windows.Shapes.Shape.FillProperty,
+                new System.Windows.Data.Binding(nameof(Foreground))
+                {
+                    RelativeSource = new System.Windows.Data.RelativeSource(
+                        System.Windows.Data.RelativeSourceMode.FindAncestor,
+                        typeof(Button),
+                        1)
+                });
+        }
+        return path;
     }
 
     private CheckBox BoundCheckBox(string text, string path, bool rebuild = false)
@@ -627,28 +678,21 @@ public partial class NativeMainWindow : Window, ISettingsWindow
                 Tag = string.Equals(option.Value, current, StringComparison.OrdinalIgnoreCase) ? "active" : null,
                 BorderThickness = index == values.Length - 1 ? new Thickness(0) : new Thickness(0, 0, 1, 0)
             };
-            button.Content = string.IsNullOrWhiteSpace(option.Glyph)
-                ? option.Label
-                : new StackPanel
+            if (option.Icon is null)
+            {
+                button.Content = option.Label;
+            }
+            else
+            {
+                var content = new StackPanel { Orientation = Orientation.Horizontal };
+                content.Children.Add(MaterialIcon(option.Icon, 16, margin: new Thickness(0, 0, 7, 0)));
+                content.Children.Add(new TextBlock
                 {
-                    Orientation = Orientation.Horizontal,
-                    Children =
-                    {
-                        new TextBlock
-                        {
-                            Text = option.Glyph,
-                            FontFamily = new FontFamily("Segoe Fluent Icons"),
-                            FontSize = 14,
-                            Margin = new Thickness(0, 0, 7, 0),
-                            VerticalAlignment = VerticalAlignment.Center
-                        },
-                        new TextBlock
-                        {
-                            Text = option.Label,
-                            VerticalAlignment = VerticalAlignment.Center
-                        }
-                    }
-                };
+                    Text = option.Label,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                button.Content = content;
+            }
             button.Click += (_, _) =>
             {
                 Set(path, option.Value);
@@ -749,7 +793,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return $"{amount:0.#} {units[unit]}";
     }
 
-    private sealed record Option(string Value, string Label, string? Glyph = null)
+    private sealed record Option(string Value, string Label, Geometry? Icon = null)
     {
         public override string ToString() => Label;
     }

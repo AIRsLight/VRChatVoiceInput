@@ -166,7 +166,7 @@ public partial class NativeMainWindow
         {
             var active = IsAssetActive(asset);
             var button = compact
-                ? IconButton("\uE73E", T(active ? "Active" : "Use"), (_, _) =>
+                ? IconButton(MaterialIconPaths.Check, T(active ? "Active" : "Use"), (_, _) =>
                 {
                     ApplyAsset(asset);
                     MarkDirty(rebuild: true);
@@ -175,7 +175,7 @@ public partial class NativeMainWindow
                 {
                     ApplyAsset(asset);
                     MarkDirty(rebuild: true);
-                }, !active);
+                }, !active, MaterialIconPaths.Check);
             button.IsEnabled = !active;
             if (!compact)
             {
@@ -189,8 +189,8 @@ public partial class NativeMainWindow
         else
         {
             var button = compact
-                ? IconButton("\uE896", T("Download"), async (_, _) => await DownloadAssetAsync(asset))
-                : ActionButton(T("Download"), async (_, _) => await DownloadAssetAsync(asset), true);
+                ? IconButton(MaterialIconPaths.Download, T("Download"), async (_, _) => await DownloadAssetAsync(asset))
+                : ActionButton(T("Download"), async (_, _) => await DownloadAssetAsync(asset), true, MaterialIconPaths.Download);
             if (!compact)
             {
                 button.Width = 88;
@@ -266,7 +266,11 @@ public partial class NativeMainWindow
         var languages = FactCell(T("Languages"), T(fact.Languages));
         var files = FactCell(T("Model files"), selectedAsset is null ? T("Not measured") : FormatBytes(selectedAsset.Size));
         var memory = FactCell(T("Estimated peak RAM"), fact.Performance.Ram);
-        var throughput = FactCell(T("Tested throughput"), fact.Performance.Throughput, rightBorder: false);
+        var throughput = FactCell(
+            T("Tested throughput"),
+            fact.Performance.Throughput,
+            rightBorder: false,
+            toolTip: T("Measured on an Intel Core i7-14700KF system with 64 GB RAM."));
         Grid.SetColumn(languages, 0);
         Grid.SetColumn(files, 1);
         Grid.SetColumn(memory, 2);
@@ -367,10 +371,24 @@ public partial class NativeMainWindow
     private string FormatThroughput(int charactersPerSecond) =>
         string.Format(CultureInfo.InvariantCulture, T("~{0} characters/s"), charactersPerSecond);
 
-    private Border FactCell(string label, string value, bool rightBorder = true)
+    private Border FactCell(string label, string value, bool rightBorder = true, string? toolTip = null)
     {
         var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = label, FontSize = 10, Foreground = MutedBrush });
+        if (toolTip is null)
+        {
+            stack.Children.Add(new TextBlock { Text = label, FontSize = 10, Foreground = MutedBrush });
+        }
+        else
+        {
+            var labelRow = new StackPanel { Orientation = Orientation.Horizontal, ToolTip = toolTip };
+            labelRow.Children.Add(new TextBlock { Text = label, FontSize = 10, Foreground = MutedBrush });
+            labelRow.Children.Add(MaterialIcon(
+                MaterialIconPaths.InformationOutline,
+                12,
+                MutedBrush,
+                new Thickness(4, 0, 0, 0)));
+            stack.Children.Add(labelRow);
+        }
         stack.Children.Add(new TextBlock
         {
             Text = value,
@@ -384,6 +402,7 @@ public partial class NativeMainWindow
             Padding = new Thickness(12, 10, 12, 10),
             BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)),
             BorderThickness = rightBorder ? new Thickness(0, 0, 1, 0) : new Thickness(0),
+            ToolTip = toolTip,
             Child = stack
         };
     }
@@ -530,7 +549,7 @@ public partial class NativeMainWindow
                 Filter = kind == "executable" ? "Executable (*.exe)|*.exe|All files (*.*)|*.*" : "Model files|*.gguf;*.onnx;*.bin|All files (*.*)|*.*"
             };
             if (dialogFile.ShowDialog(this) == true) text.Text = dialogFile.FileName;
-        });
+        }, icon: MaterialIconPaths.FolderOpenOutline);
         browse.Margin = new Thickness(8, 0, 0, 0);
         Grid.SetColumn(browse, 1);
         grid.Children.Add(text);

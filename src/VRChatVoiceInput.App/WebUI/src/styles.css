@@ -131,7 +131,8 @@ button {
   width: 17px;
   height: 17px;
   flex: 0 0 auto;
-  stroke-width: 1.8;
+  fill: currentColor;
+  stroke: none;
 }
 
 .sidebar-footer {
@@ -595,7 +596,8 @@ button {
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
-  stroke-width: 1.8;
+  fill: currentColor;
+  stroke: none;
 }
 
 .segment:last-child {
@@ -959,6 +961,18 @@ button {
   margin-bottom: 4px;
   color: var(--muted);
   font-size: 10px;
+}
+
+.model-fact .model-fact-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.model-fact-label svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
 }
 
 .model-fact.wide span {

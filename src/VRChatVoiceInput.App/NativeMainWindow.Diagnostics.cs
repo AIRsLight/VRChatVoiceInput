@@ -39,7 +39,7 @@ public partial class NativeMainWindow
         root.Children.Add(BuildOutputTest());
 
         var logPath = new TextBox { Text = AppFileLogger.CurrentLogPath, IsReadOnly = true };
-        var reveal = IconButton("\uE8B7", T("Open log file"), (_, _) => RevealPath(AppFileLogger.CurrentLogPath));
+        var reveal = IconButton(MaterialIconPaths.FolderOpenOutline, T("Open log file"), (_, _) => RevealPath(AppFileLogger.CurrentLogPath));
         var logPathRow = new Grid();
         logPathRow.ColumnDefinitions.Add(new ColumnDefinition());
         logPathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
@@ -55,9 +55,9 @@ public partial class NativeMainWindow
 
         var logHeader = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 22, 0, 10) };
         var logActions = new StackPanel { Orientation = Orientation.Horizontal };
-        var refresh = IconButton("\uE72C", T("Refresh"), (_, _) => BuildCurrentPage());
+        var refresh = IconButton(MaterialIconPaths.Refresh, T("Refresh"), (_, _) => BuildCurrentPage());
         refresh.Margin = new Thickness(0, 0, 6, 0);
-        var clear = IconButton("\uE74D", T("Clear view"), (_, _) =>
+        var clear = IconButton(MaterialIconPaths.DeleteOutline, T("Clear view"), (_, _) =>
         {
             _diagnosticLogPanel?.Children.Clear();
             _diagnosticLogPanel?.Children.Add(new TextBlock
@@ -157,7 +157,7 @@ public partial class NativeMainWindow
             {
                 ShowError(exception);
             }
-        });
+        }, icon: MaterialIconPaths.Send);
         send.HorizontalAlignment = HorizontalAlignment.Left;
         send.Margin = new Thickness(0, 8, 0, 0);
         var fields = new List<UIElement>

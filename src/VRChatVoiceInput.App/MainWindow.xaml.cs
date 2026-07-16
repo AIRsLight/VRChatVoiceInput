@@ -157,7 +157,9 @@ public partial class MainWindow : Window, ISettingsWindow
         {
             await SavePendingConfigurationAsync();
             _allowClose = true;
-            Close();
+            await Dispatcher.InvokeAsync(
+                Close,
+                System.Windows.Threading.DispatcherPriority.Background);
             return true;
         }
         catch (Exception exception)
