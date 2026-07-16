@@ -23,6 +23,8 @@ The immutable URL format is:
 https://huggingface.co/{repository}/resolve/{revision}/{file}?download=true
 ```
 
+The Models page offers `Hugging Face` and `HF Mirror` download-source buttons. `HF Mirror` rewrites only `huggingface.co` resolve URLs to `https://hf-mirror.com`; fixed GitHub release URLs keep their original host. The selected source is stored as `application.modelDownloadSource` and applies to the next download without changing repository revisions, expected sizes, or SHA-256 values. The mirror is a third-party service, so hash verification remains mandatory before a downloaded file can replace an installed file.
+
 Interrupted transfers remain as `*.download` files and resume on the next attempt. A canceled or failed transfer never replaces a working model. Updating a model intentionally requires updating the pinned revision, size, and SHA-256 together in `ModelDownloadCatalog`.
 
 The shared Silero VAD is downloaded from the official sherpa-onnx GitHub release URL. The optional Paraformer punctuation ONNX is mirrored unchanged from the official sherpa-onnx INT8 release archive because Windows `tar.exe` cannot reliably extract `.tar.bz2` without an external `bzip2.exe`. The mirrored ONNX retains the verified official extracted-file size and SHA-256, so clients download it directly without an extraction dependency.

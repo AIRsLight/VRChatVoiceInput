@@ -19,6 +19,7 @@ The current default is the local Paraformer Q5_0 GGUF provider on CPU. Q8_0 and 
 - Per-application profiles with a running-process picker, dynamic foreground fallback, native keyboard/XInput binding capture, provider selection, hotwords, output method, and submission hotkeys.
 - Native WPF settings interface with automatic configuration saves, tray lifecycle, runtime control, preset/model editors, live process memory and recognition timing diagnostics, per-preset output testing, and runtime logs. Native, model, provider, and WPF failures are written to daily files under `%LocalAppData%\VRChatVoiceInput\Logs` and retained for 14 days.
 - Staged model/runtime installation for source-only packages: incomplete component selections save normally, while service startup is refused with a localized missing-file banner and detailed prompt until the active preset is ready.
+- Selectable Hugging Face or HF Mirror model download source, with pinned revisions and SHA-256 verification retained for either route.
 - Explicit runtime profile activation, per-profile microphone overrides, and installed-model availability checks.
 - Live native level meters for every active microphone.
 - Enumerated Vulkan GPU selection for the bundled SenseVoice and whisper.cpp Vulkan runtimes, including Intel and AMD integrated adapters exposed by the Windows graphics driver.

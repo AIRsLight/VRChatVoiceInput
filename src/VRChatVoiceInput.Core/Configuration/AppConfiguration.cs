@@ -96,6 +96,9 @@ public sealed class ApplicationHostConfiguration
 
     [JsonPropertyName("startWithWindows")]
     public bool StartWithWindows { get; init; }
+
+    [JsonPropertyName("modelDownloadSource")]
+    public string ModelDownloadSource { get; init; } = "official";
 }
 
 public sealed class AsrConfiguration

@@ -358,7 +358,12 @@ public sealed class RuntimeController : IAsyncDisposable
             asrConfigurationJson,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("ASR configuration is required.");
-        var completed = await _modelDownloads.DownloadAsync(providerId, configuration, cancellationToken);
+        var downloadSource = LoadConfiguration().Application.ModelDownloadSource;
+        var completed = await _modelDownloads.DownloadAsync(
+            providerId,
+            configuration,
+            ModelDownloadSource.IsHuggingFaceMirror(downloadSource),
+            cancellationToken);
         return new
         {
             completed,
@@ -370,6 +375,7 @@ public sealed class RuntimeController : IAsyncDisposable
     internal async Task<object> DownloadModelAssetAsync(
         string assetId,
         string asrConfigurationJson,
+        string downloadSource,
         CancellationToken cancellationToken = default)
     {
         var configuration = JsonSerializer.Deserialize<AsrConfiguration>(
@@ -388,7 +394,10 @@ public sealed class RuntimeController : IAsyncDisposable
         bool completed;
         try
         {
-            completed = await _modelDownloads.DownloadAssetAsync(assetId, cancellationToken);
+            completed = await _modelDownloads.DownloadAssetAsync(
+                assetId,
+                ModelDownloadSource.IsHuggingFaceMirror(downloadSource),
+                cancellationToken);
             AddHostLog("download", $"Downloaded and verified '{assetId}'.");
         }
         catch (Exception exception)

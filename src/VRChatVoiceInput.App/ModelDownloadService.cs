@@ -35,23 +35,31 @@ internal sealed class ModelDownloadService : IDisposable
     public async Task<bool> DownloadAsync(
         string providerId,
         AsrConfiguration configuration,
+        bool useHuggingFaceMirror,
         CancellationToken cancellationToken = default) =>
         await DownloadItemsAsync(
             providerId,
             ModelDownloadCatalog.Resolve(providerId, configuration),
+            useHuggingFaceMirror,
             cancellationToken);
 
     public async Task<bool> DownloadAssetAsync(
         string assetId,
+        bool useHuggingFaceMirror,
         CancellationToken cancellationToken = default)
     {
         var package = ModelDownloadCatalog.ResolvePackage(assetId);
-        return await DownloadItemsAsync(package.ProviderId, package.Items, cancellationToken);
+        return await DownloadItemsAsync(
+            package.ProviderId,
+            package.Items,
+            useHuggingFaceMirror,
+            cancellationToken);
     }
 
     private async Task<bool> DownloadItemsAsync(
         string providerId,
         IReadOnlyList<ModelDownloadItem> assets,
+        bool useHuggingFaceMirror,
         CancellationToken cancellationToken)
     {
         CancellationTokenSource operationCancellation;
@@ -96,6 +104,7 @@ internal sealed class ModelDownloadService : IDisposable
                     targetPath,
                     completedBytes,
                     totalBytes,
+                    useHuggingFaceMirror,
                     operationCancellation.Token);
                 completedBytes += item.Asset.TransferSize;
             }
@@ -155,6 +164,7 @@ internal sealed class ModelDownloadService : IDisposable
         string targetPath,
         long completedBytes,
         long totalBytes,
+        bool useHuggingFaceMirror,
         CancellationToken cancellationToken)
     {
         Exception? lastError = null;
@@ -162,7 +172,14 @@ internal sealed class ModelDownloadService : IDisposable
         {
             try
             {
-                await DownloadAssetAsync(providerId, asset, targetPath, completedBytes, totalBytes, cancellationToken);
+                await DownloadAssetAsync(
+                    providerId,
+                    asset,
+                    targetPath,
+                    completedBytes,
+                    totalBytes,
+                    useHuggingFaceMirror,
+                    cancellationToken);
                 return;
             }
             catch (OperationCanceledException)
@@ -198,6 +215,7 @@ internal sealed class ModelDownloadService : IDisposable
         string targetPath,
         long completedBytes,
         long totalBytes,
+        bool useHuggingFaceMirror,
         CancellationToken cancellationToken)
     {
         if (asset.Archive is not null)
@@ -208,6 +226,7 @@ internal sealed class ModelDownloadService : IDisposable
                 targetPath,
                 completedBytes,
                 totalBytes,
+                useHuggingFaceMirror,
                 cancellationToken);
             return;
         }
@@ -238,7 +257,9 @@ internal sealed class ModelDownloadService : IDisposable
             existingLength = 0;
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, asset.DownloadUrl);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            asset.GetDownloadUrl(useHuggingFaceMirror));
         if (existingLength > 0)
         {
             request.Headers.Range = new RangeHeaderValue(existingLength, null);
@@ -329,6 +350,7 @@ internal sealed class ModelDownloadService : IDisposable
         string targetPath,
         long completedBytes,
         long totalBytes,
+        bool useHuggingFaceMirror,
         CancellationToken cancellationToken)
     {
         var archive = asset.Archive!;
@@ -348,6 +370,7 @@ internal sealed class ModelDownloadService : IDisposable
                 archivePath,
                 completedBytes,
                 totalBytes,
+                useHuggingFaceMirror,
                 cancellationToken);
         }
 
@@ -535,12 +558,41 @@ internal sealed record ModelAsset(
 {
     public long TransferSize => Archive?.Size ?? Size;
 
-    public string DownloadUrl =>
-        DirectDownloadUrl ??
-        $"https://huggingface.co/{Repository}/resolve/{Revision}/{EscapeRepositoryPath(FileName)}?download=true";
+    public string GetDownloadUrl(bool useHuggingFaceMirror)
+    {
+        var url = DirectDownloadUrl ??
+            $"https://huggingface.co/{Repository}/resolve/{Revision}/{EscapeRepositoryPath(FileName)}?download=true";
+        return useHuggingFaceMirror ? ModelDownloadSource.RewriteHuggingFaceUrl(url) : url;
+    }
 
     private static string EscapeRepositoryPath(string path) =>
         string.Join('/', path.Replace('\\', '/').Split('/').Select(Uri.EscapeDataString));
+}
+
+internal static class ModelDownloadSource
+{
+    public const string HuggingFaceMirror = "hf-mirror";
+    private const string OfficialHuggingFaceHost = "huggingface.co";
+    private const string MirrorHuggingFaceHost = "hf-mirror.com";
+
+    public static bool IsHuggingFaceMirror(string? source) =>
+        string.Equals(source, HuggingFaceMirror, StringComparison.OrdinalIgnoreCase);
+
+    public static string RewriteHuggingFaceUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            !string.Equals(uri.Host, OfficialHuggingFaceHost, StringComparison.OrdinalIgnoreCase))
+        {
+            return url;
+        }
+
+        return new UriBuilder(uri)
+        {
+            Scheme = Uri.UriSchemeHttps,
+            Host = MirrorHuggingFaceHost,
+            Port = -1
+        }.Uri.AbsoluteUri;
+    }
 }
 
 internal sealed record ModelArchive(

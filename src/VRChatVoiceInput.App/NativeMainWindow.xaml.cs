@@ -838,11 +838,20 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return combo;
     }
 
-    private FrameworkElement SegmentedControl(string path, IEnumerable<Option> options, bool rebuild = true)
+    private FrameworkElement SegmentedControl(
+        string path,
+        IEnumerable<Option> options,
+        bool rebuild = true,
+        string? fallback = null)
     {
         var values = options.ToArray();
         var grid = new Grid();
-        var current = GetString(path);
+        var current = GetString(path, fallback ?? string.Empty);
+        if (fallback is not null && !values.Any(option =>
+                string.Equals(option.Value, current, StringComparison.OrdinalIgnoreCase)))
+        {
+            current = fallback;
+        }
         for (var index = 0; index < values.Length; index++)
         {
             grid.ColumnDefinitions.Add(new ColumnDefinition());

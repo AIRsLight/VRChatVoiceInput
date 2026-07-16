@@ -23,6 +23,18 @@ public partial class NativeMainWindow
     private UIElement BuildModelsPage()
     {
         var root = new StackPanel { MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Stretch };
+        root.Children.Add(Section(
+            T("Download source"),
+            T("HF Mirror is a third-party service. GitHub downloads keep their original source, and every file is still verified by SHA-256."),
+            SegmentedControl(
+                "application.modelDownloadSource",
+                [
+                    new Option("official", "Hugging Face"),
+                    new Option("hf-mirror", "HF Mirror")
+                ],
+                fallback: "official")));
+        root.Children.Add(new Border { Height = 18 });
+
         var tabs = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 18) };
         foreach (var provider in ProviderLabels)
         {
@@ -209,7 +221,10 @@ public partial class NativeMainWindow
     {
         try
         {
-            await _controller.DownloadModelAssetAsync(asset.Id, GetNode("asr")!.ToJsonString());
+            await _controller.DownloadModelAssetAsync(
+                asset.Id,
+                GetNode("asr")!.ToJsonString(),
+                GetString("application.modelDownloadSource", "official"));
             var installed = ModelDownloadCatalog.GetAssetStatuses().First(item => item.Id == asset.Id);
             if (installed.Installed)
             {
