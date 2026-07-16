@@ -35,6 +35,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
     private readonly DispatcherTimer _toastTimer;
     private readonly DispatcherTimer _diagnosticTimer;
     private JsonObject _configuration = new();
+    private readonly Dictionary<string, string> _selectedModelAssetIds = new(StringComparer.OrdinalIgnoreCase);
     private string _view = "general";
     private int _selectedProfileIndex;
     private string _profileTab = "input";
@@ -592,14 +593,14 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return textBox;
     }
 
-    private ComboBox BoundCombo(string path, IEnumerable<Option> options, bool rebuild = false)
+    private ComboBox BoundCombo(string path, IEnumerable<Option> options, bool rebuild = false, string? fallback = null)
     {
         var combo = new ComboBox
         {
             ItemsSource = options.ToArray(),
             DisplayMemberPath = nameof(Option.Label),
             SelectedValuePath = nameof(Option.Value),
-            SelectedValue = GetString(path)
+            SelectedValue = GetString(path, fallback ?? string.Empty)
         };
         combo.SelectionChanged += (_, _) =>
         {
@@ -621,12 +622,33 @@ public partial class NativeMainWindow : Window, ISettingsWindow
             var option = values[index];
             var button = new Button
             {
-                Content = option.Label,
                 Style = (Style)FindResource("SegmentButtonStyle"),
                 MinWidth = 88,
                 Tag = string.Equals(option.Value, current, StringComparison.OrdinalIgnoreCase) ? "active" : null,
                 BorderThickness = index == values.Length - 1 ? new Thickness(0) : new Thickness(0, 0, 1, 0)
             };
+            button.Content = string.IsNullOrWhiteSpace(option.Glyph)
+                ? option.Label
+                : new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = option.Glyph,
+                            FontFamily = new FontFamily("Segoe Fluent Icons"),
+                            FontSize = 14,
+                            Margin = new Thickness(0, 0, 7, 0),
+                            VerticalAlignment = VerticalAlignment.Center
+                        },
+                        new TextBlock
+                        {
+                            Text = option.Label,
+                            VerticalAlignment = VerticalAlignment.Center
+                        }
+                    }
+                };
             button.Click += (_, _) =>
             {
                 Set(path, option.Value);
@@ -727,7 +749,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return $"{amount:0.#} {units[unit]}";
     }
 
-    private sealed record Option(string Value, string Label)
+    private sealed record Option(string Value, string Label, string? Glyph = null)
     {
         public override string ToString() => Label;
     }

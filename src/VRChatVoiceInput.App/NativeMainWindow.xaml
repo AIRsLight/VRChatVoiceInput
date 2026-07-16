@@ -55,10 +55,37 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style TargetType="Button" x:Key="PrimaryButtonStyle" BasedOn="{StaticResource ActionButtonStyle}">
+        <Style TargetType="Button" x:Key="PrimaryButtonStyle">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="PrimaryBorder" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="PrimaryBorder" Property="Background" Value="{StaticResource AccentHoverBrush}" />
+                                <Setter TargetName="PrimaryBorder" Property="BorderBrush" Value="{StaticResource AccentHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="PrimaryBorder" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style TargetType="Button" x:Key="IconButtonStyle" BasedOn="{StaticResource ActionButtonStyle}">
             <Setter Property="Width" Value="34" />

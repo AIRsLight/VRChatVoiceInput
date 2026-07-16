@@ -73,8 +73,7 @@ public partial class NativeMainWindow
         foreach (var group in assets)
         {
             var componentAssets = group.ToArray();
-            var active = componentAssets.FirstOrDefault(IsAssetActive);
-            var selected = active ?? componentAssets.FirstOrDefault(asset => asset.Installed) ?? componentAssets[0];
+            var selected = SelectModelAsset(componentAssets)!;
             var row = new Grid
             {
                 Margin = new Thickness(0, 0, 0, 1),
@@ -84,7 +83,7 @@ public partial class NativeMainWindow
             row.ColumnDefinitions.Add(new ColumnDefinition());
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(primaryOnly ? 0 : 230) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(105) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(primaryOnly ? 104 : 44) });
 
             if (!primaryOnly)
             {
@@ -114,7 +113,8 @@ public partial class NativeMainWindow
                 combo.SelectionChanged += (_, _) =>
                 {
                     if (_building || combo.SelectedValue is not ModelAssetStatus next) return;
-                    BuildAssetAction(row, next);
+                    _selectedModelAssetIds[ModelAssetSelectionKey(next.ProviderId, next.ComponentId)] = next.Id;
+                    BuildCurrentPage();
                 };
                 selector = combo;
             }
@@ -131,7 +131,7 @@ public partial class NativeMainWindow
             }
             Grid.SetColumn(selector, primaryOnly ? 0 : 1);
             row.Children.Add(selector);
-            BuildAssetAction(row, selected);
+            BuildAssetAction(row, selected, compact: !primaryOnly);
             rows.Children.Add(row);
         }
 
@@ -146,7 +146,7 @@ public partial class NativeMainWindow
                 rows);
     }
 
-    private void BuildAssetAction(Grid row, ModelAssetStatus asset)
+    private void BuildAssetAction(Grid row, ModelAssetStatus asset, bool compact)
     {
         foreach (var child in row.Children.Cast<UIElement>().Where(child => Grid.GetColumn(child) >= 2).ToArray())
         {
@@ -164,19 +164,40 @@ public partial class NativeMainWindow
         UIElement action;
         if (asset.Installed)
         {
-            var button = ActionButton(IsAssetActive(asset) ? T("Active") : T("Use"), (_, _) =>
+            var active = IsAssetActive(asset);
+            var button = compact
+                ? IconButton("\uE73E", T(active ? "Active" : "Use"), (_, _) =>
+                {
+                    ApplyAsset(asset);
+                    MarkDirty(rebuild: true);
+                })
+                : ActionButton(active ? T("Active") : T("Use"), (_, _) =>
+                {
+                    ApplyAsset(asset);
+                    MarkDirty(rebuild: true);
+                }, !active);
+            button.IsEnabled = !active;
+            if (!compact)
             {
-                ApplyAsset(asset);
-                MarkDirty(rebuild: true);
-            }, !IsAssetActive(asset));
-            button.IsEnabled = !IsAssetActive(asset);
-            button.Margin = new Thickness(8);
+                button.Width = 88;
+                button.Height = 34;
+            }
+            button.VerticalAlignment = VerticalAlignment.Center;
+            button.HorizontalAlignment = HorizontalAlignment.Center;
             action = button;
         }
         else
         {
-            var button = ActionButton(T("Download"), async (_, _) => await DownloadAssetAsync(asset), true);
-            button.Margin = new Thickness(8);
+            var button = compact
+                ? IconButton("\uE896", T("Download"), async (_, _) => await DownloadAssetAsync(asset))
+                : ActionButton(T("Download"), async (_, _) => await DownloadAssetAsync(asset), true);
+            if (!compact)
+            {
+                button.Width = 88;
+                button.Height = 34;
+            }
+            button.VerticalAlignment = VerticalAlignment.Center;
+            button.HorizontalAlignment = HorizontalAlignment.Center;
             button.IsEnabled = _downloadProgress?.State is not ("checking" or "downloading" or "verifying" or "extracting");
             action = button;
         }
@@ -206,36 +227,33 @@ public partial class NativeMainWindow
 
     private UIElement BuildModelFacts()
     {
+        var primaryAssets = ModelDownloadCatalog.GetAssetStatuses()
+            .Where(asset => asset.ProviderId == _selectedProvider && asset.ComponentId == PrimaryModelComponent(_selectedProvider))
+            .ToArray();
+        var selectedAsset = SelectModelAsset(primaryAssets);
         var fact = _selectedProvider switch
         {
             "paraformer-gguf" => new ModelFact(
                 "Mandarin Chinese; limited English code-switching",
-                ParaformerRamAndThroughput(),
+                ParaformerRamAndThroughput(selectedAsset),
                 "Fast Mandarin input with low CPU and memory cost."),
             "sensevoice-gguf" => new ModelFact(
                 "Mandarin, Cantonese, English, Japanese, Korean",
-                SenseVoiceRamAndThroughput(),
+                SenseVoiceRamAndThroughput(selectedAsset),
                 "Low-latency multilingual input for East Asian languages."),
             "funasr-nano-gguf" => new ModelFact(
                 "Chinese, English, Japanese",
-                GetString("asr.funAsrNano.backend", "cpu") == "vulkan" ? ("Not measured", "Not measured") : ("1131.5 MiB", "~64 characters/s"),
+                NanoRamAndThroughput(selectedAsset),
                 "Terminology and punctuation when more memory is available."),
             "qwen3-asr" => new ModelFact(
                 "30 languages and 22 Chinese dialects",
-                ("~2.2-3.0 GiB", "~28 characters/s"),
+                ("~2.2-3.0 GiB", FormatThroughput(28)),
                 "High-quality multilingual and mixed-language recognition."),
             _ => new ModelFact(
                 "Multilingual Whisper model",
-                ("~590 MiB", "~12 characters/s"),
+                ("~590 MiB", FormatThroughput(12)),
                 "Broad language coverage when higher latency is acceptable.")
         };
-
-        var primaryAssets = ModelDownloadCatalog.GetAssetStatuses()
-            .Where(asset => asset.ProviderId == _selectedProvider && asset.ComponentId == PrimaryModelComponent(_selectedProvider))
-            .ToArray();
-        var selectedAsset = primaryAssets.FirstOrDefault(IsAssetActive)
-            ?? primaryAssets.FirstOrDefault(asset => asset.Installed)
-            ?? primaryAssets.FirstOrDefault();
 
         var grid = new Grid { Margin = new Thickness(0, 0, 0, 12) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.35, GridUnitType.Star) });
@@ -306,29 +324,48 @@ public partial class NativeMainWindow
         };
     }
 
-    private (string Ram, string Throughput) ParaformerRamAndThroughput()
+    private (string Ram, string Throughput) ParaformerRamAndThroughput(ModelAssetStatus? asset)
     {
-        var file = Path.GetFileName(GetString("asr.paraformer.modelPath")).ToLowerInvariant();
-        return file switch
+        return asset?.Id switch
         {
-            "paraformer-q8.gguf" => ("252.8 MiB", "~148 characters/s"),
-            "paraformer-q4_0.gguf" => ("151.1 MiB", "~172 characters/s"),
-            "paraformer-q5_0.gguf" => ("176.5 MiB", "~124 characters/s"),
-            _ => ("Not measured", "Not measured")
+            "paraformer-q8_0" => ("252.8 MiB", FormatThroughput(148)),
+            "paraformer-q4_0" => ("151.1 MiB", FormatThroughput(172)),
+            "paraformer-q5_0" => ("176.5 MiB", FormatThroughput(124)),
+            _ => NotMeasuredPerformance()
         };
     }
 
-    private (string Ram, string Throughput) SenseVoiceRamAndThroughput()
+    private (string Ram, string Throughput) SenseVoiceRamAndThroughput(ModelAssetStatus? asset)
     {
-        if (GetString("asr.senseVoice.backend", "cpu") == "vulkan") return ("Not measured", "Not measured");
-        var file = Path.GetFileName(GetString("asr.senseVoice.modelPath")).ToLowerInvariant();
-        return file switch
+        if (GetString("asr.senseVoice.backend", "cpu") == "vulkan") return NotMeasuredPerformance();
+        return asset?.Id switch
         {
-            "sensevoice-small-q8.gguf" => ("358.8 MiB", "~135 characters/s"),
-            "sensevoice-small-q5_0.gguf" => ("275.8 MiB", "~120 characters/s"),
-            _ => ("Not measured", "Not measured")
+            "sensevoice-q8_0" => ("358.8 MiB", FormatThroughput(135)),
+            "sensevoice-q5_0" => ("275.8 MiB", FormatThroughput(120)),
+            _ => NotMeasuredPerformance()
         };
     }
+
+    private (string Ram, string Throughput) NanoRamAndThroughput(ModelAssetStatus? languageModel)
+    {
+        if (GetString("asr.funAsrNano.backend", "cpu") == "vulkan" || languageModel is null)
+        {
+            return NotMeasuredPerformance();
+        }
+        var encoder = SelectModelAsset(ModelDownloadCatalog.GetAssetStatuses()
+            .Where(asset => asset.ProviderId == "funasr-nano-gguf" && asset.ComponentId == "encoder"));
+        return $"{encoder?.Id}:{languageModel.Id}" switch
+        {
+            "nano-encoder-q8_0:nano-language-q4_k_m" => ("1131.5 MiB", FormatThroughput(64)),
+            "nano-encoder-f16:nano-language-q4_k_m" => ("1337.5 MiB", FormatThroughput(51)),
+            _ => NotMeasuredPerformance()
+        };
+    }
+
+    private (string Ram, string Throughput) NotMeasuredPerformance() => (T("Not measured"), T("Not measured"));
+
+    private string FormatThroughput(int charactersPerSecond) =>
+        string.Format(CultureInfo.InvariantCulture, T("~{0} characters/s"), charactersPerSecond);
 
     private Border FactCell(string label, string value, bool rightBorder = true)
     {
@@ -426,8 +463,8 @@ public partial class NativeMainWindow
             MarkDirty();
         };
         children.Add(Field(T("GPU device"), deviceCombo));
-        children.Add(Notice("Vulkan performance may be faster or slower depending on the device, but an integrated GPU can reduce CPU load."));
-        return Section("CPU / Vulkan", string.Empty, children.ToArray());
+        children.Add(Notice(T("Vulkan performance may be faster or slower depending on the device, but an integrated GPU can reduce CPU load.")));
+        return Section(T("CPU / Vulkan"), string.Empty, children.ToArray());
     }
 
     private UIElement BuildAdvancedModelSettings()
@@ -447,7 +484,7 @@ public partial class NativeMainWindow
         panel.Children.Add(TwoColumns(
             Field(T("Minimum speech (seconds)"), BoundDoubleBox("asr.streaming.minimumSpeechSeconds", 0.05, 5)),
             Field(T("Maximum segment (seconds)"), BoundDoubleBox("asr.streaming.maximumSegmentSeconds", 1, 60))));
-        panel.Children.Add(Field("Silero VAD", PathField("asr.streaming.sileroVadModelPath", "model")));
+        panel.Children.Add(Field(T("Silero VAD"), PathField("asr.streaming.sileroVadModelPath", "model")));
         var expander = new Expander
         {
             Header = T("Advanced model configuration"),
@@ -538,6 +575,30 @@ public partial class NativeMainWindow
         "qwen3-asr" => "model-bundle",
         _ => "model"
     };
+
+    private ModelAssetStatus? SelectModelAsset(IEnumerable<ModelAssetStatus> assets)
+    {
+        var candidates = assets.ToArray();
+        if (candidates.Length == 0)
+        {
+            return null;
+        }
+        var key = ModelAssetSelectionKey(candidates[0].ProviderId, candidates[0].ComponentId);
+        if (_selectedModelAssetIds.TryGetValue(key, out var selectedId))
+        {
+            var selected = candidates.FirstOrDefault(asset => string.Equals(asset.Id, selectedId, StringComparison.OrdinalIgnoreCase));
+            if (selected is not null)
+            {
+                return selected;
+            }
+            _selectedModelAssetIds.Remove(key);
+        }
+        return candidates.FirstOrDefault(IsAssetActive)
+            ?? candidates.FirstOrDefault(asset => asset.Installed)
+            ?? candidates[0];
+    }
+
+    private static string ModelAssetSelectionKey(string providerId, string componentId) => $"{providerId}:{componentId}";
 
     private bool IsAssetActive(ModelAssetStatus asset)
     {

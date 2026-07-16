@@ -305,10 +305,10 @@ public partial class NativeMainWindow
             $"{basePath}.input.mode",
             new[]
             {
-                new Option("keyboard", T("Keyboard")),
-                new Option("mouse", T("Mouse")),
-                new Option("xinput", T("Gamepad")),
-                new Option("steamvr", T("SteamVR"))
+                new Option("keyboard", T("Keyboard"), "\uE765"),
+                new Option("mouse", T("Mouse"), "\uE962"),
+                new Option("xinput", T("Gamepad"), "\uE7FC"),
+                new Option("steamvr", T("SteamVR"), "\uE95B")
             });
         modeControl.Margin = new Thickness(0, 0, 0, 16);
         var triggerFields = new StackPanel();

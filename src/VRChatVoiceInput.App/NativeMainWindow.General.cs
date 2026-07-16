@@ -49,7 +49,7 @@ public partial class NativeMainWindow
             {
                 new Option("webview", "WebView2"),
                 new Option("native-wpf", "Native WPF")
-            }), T("The selected interface is used the next time settings are opened.")),
+            }, fallback: "native-wpf"), T("The selected interface is used the next time settings are opened.")),
             Field(T("Interface language"), language)));
 
         var microphones = GetMicrophones();

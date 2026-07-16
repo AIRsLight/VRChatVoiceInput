@@ -14,7 +14,7 @@ Provider model paths are global so multiple profiles can reuse one loaded model 
 
 ## Interface language
 
-`application.settingsInterface` accepts `webview` or `native-wpf`. `webview` remains the default. The General page persists the selection for the next settings window; `--native-ui` and `--web-ui` override it for the current application process without rewriting the preference.
+`application.settingsInterface` accepts `webview` or `native-wpf`. `native-wpf` is the default, while `webview` remains available as a compatibility interface. The General page persists the selection for the next settings window; `--native-ui` and `--web-ui` override it for the current application process without rewriting the preference.
 
 `application.uiLanguage` accepts `auto`, `zh`, `ja`, or `en`. `auto` maps Chinese, Japanese, and English Windows UI cultures to the corresponding interface; every unsupported system language falls back to English. The General page allows this value to be changed manually. The WebView settings UI, loading screen, message-box titles, and tray menu use the same setting.
 

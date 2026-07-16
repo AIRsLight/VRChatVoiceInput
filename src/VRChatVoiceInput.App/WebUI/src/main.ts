@@ -619,9 +619,9 @@ function applyUiLanguage(setting: string): void {
 }
 
 function normalizeConfiguration(config: AppConfiguration): AppConfiguration {
-  config.application.settingsInterface ??= "webview";
+  config.application.settingsInterface ??= "native-wpf";
   if (!["webview", "native-wpf"].includes(config.application.settingsInterface)) {
-    config.application.settingsInterface = "webview";
+    config.application.settingsInterface = "native-wpf";
   }
   config.application.uiLanguage ??= "auto";
   if (!["auto", "zh", "ja", "en"].includes(config.application.uiLanguage)) {

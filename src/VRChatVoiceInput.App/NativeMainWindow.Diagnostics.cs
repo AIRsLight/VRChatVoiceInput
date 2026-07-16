@@ -22,7 +22,7 @@ public partial class NativeMainWindow
 
         var metrics = new UniformGrid { Columns = 5 };
         metrics.Children.Add(Metric(T("Service status"), T(_controller.IsRunning ? "Running" : "Stopped")));
-        metrics.Children.Add(Metric("Microphones", GetMicrophones().Count.ToString()));
+        metrics.Children.Add(Metric(T("Microphones"), GetMicrophones().Count.ToString()));
         metrics.Children.Add(Metric(T("Profiles"), Profiles.Count.ToString()));
         metrics.Children.Add(Metric(T("Current memory"), _diagnosticMemoryText));
         metrics.Children.Add(Metric(T("Average generation time"), _diagnosticAverageText));
@@ -151,7 +151,7 @@ public partial class NativeMainWindow
                     ? parsed
                     : null;
                 await _controller.SendOutputTestAsync(profileId, text.Text, processId);
-                ShowToast("Test output sent.");
+                ShowToast(T("Test output sent."));
             }
             catch (Exception exception)
             {
