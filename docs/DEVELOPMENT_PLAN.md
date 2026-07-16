@@ -129,7 +129,7 @@ Status: five local CPU providers implemented; cloud providers remain. See [MODEL
 Status: initial desktop UI and tray application implemented; self-contained packaging and runtime/model update management remain. See [UI_ARCHITECTURE.md](UI_ARCHITECTURE.md).
 
 - Windows desktop configuration page and system tray lifecycle. Implemented.
-- WPF native host with a WebView2 configuration surface. Implemented.
+- Native WPF configuration surface. Implemented.
 - Microphone, PTT binding, ASR provider, target, and per-application profile editors. Implemented.
 - Self-contained Windows release without a separately installed .NET runtime.
 - Runtime/model download verification and update policy.

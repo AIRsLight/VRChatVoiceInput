@@ -21,7 +21,6 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = $PSScriptRoot
 $appProject = Join-Path $repoRoot "src\VRChatVoiceInput.App\VRChatVoiceInput.App.csproj"
-$webUiDirectory = Join-Path $repoRoot "src\VRChatVoiceInput.App\WebUI"
 $configPath = if (![string]::IsNullOrWhiteSpace($ConfigurationPath)) {
     [System.IO.Path]::GetFullPath((Join-Path $repoRoot $ConfigurationPath))
 }
@@ -403,7 +402,7 @@ if (Get-Process -Name "VRChatVoiceInput.App" -ErrorAction SilentlyContinue) {
     throw "VRChat Voice Input is running. Exit it from the tray before building the portable package."
 }
 
-$requiredPaths = @($appProject, $webUiDirectory, $configPath, $openVrLicensePath, $senseVoiceLicensePath, $paraformerLicensePath, $funAsrNanoLicensePath)
+$requiredPaths = @($appProject, $configPath, $openVrLicensePath, $senseVoiceLicensePath, $paraformerLicensePath, $funAsrNanoLicensePath)
 if ($ModelSet -ne "none") {
     $requiredPaths += $modelsDirectory
 }
@@ -426,12 +425,7 @@ if (Test-Path -LiteralPath $archivePath) {
     Remove-Item -LiteralPath $archivePath -Force
 }
 
-Write-Host "[1/6] Building packaged WebView UI..."
-Invoke-CheckedCommand -Command "npm.cmd" -Arguments @("ci") -WorkingDirectory $webUiDirectory
-Invoke-CheckedCommand -Command "npm.cmd" -Arguments @("run", "typecheck") -WorkingDirectory $webUiDirectory
-Invoke-CheckedCommand -Command "npm.cmd" -Arguments @("run", "build") -WorkingDirectory $webUiDirectory
-
-Write-Host "[2/6] Publishing self-contained $RuntimeIdentifier application..."
+Write-Host "[1/5] Publishing self-contained $RuntimeIdentifier application..."
 Invoke-CheckedCommand -Command "dotnet" -Arguments @(
     "publish",
     $appProject,
@@ -445,7 +439,7 @@ Invoke-CheckedCommand -Command "dotnet" -Arguments @(
     "-p:DebugSymbols=false"
 ) -WorkingDirectory $repoRoot
 
-Write-Host "[3/6] Copying configuration and $RuntimeSet ASR runtime set..."
+Write-Host "[2/5] Copying configuration and $RuntimeSet ASR runtime set..."
 Copy-Item -LiteralPath $configPath -Destination (Join-Path $packageDirectory "appsettings.json") -Force
 $configuration = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
 if ($RuntimeSet -ne "none") {
@@ -464,7 +458,7 @@ Copy-Item -LiteralPath $senseVoiceLicensePath -Destination (Join-Path $licensesD
 Copy-Item -LiteralPath $paraformerLicensePath -Destination (Join-Path $licensesDirectory "funasr-LICENSE.txt") -Force
 Copy-Item -LiteralPath $funAsrNanoLicensePath -Destination (Join-Path $licensesDirectory "funasr-nano-LICENSE.txt") -Force
 
-Write-Host "[4/6] Copying $ModelSet model set..."
+Write-Host "[3/5] Copying $ModelSet model set..."
 if ($ModelSet -eq "none") {
     Write-Host "No model files are included; install them from the Models page."
 }
@@ -493,7 +487,6 @@ VRChat Voice Input portable test build
 7. SteamVR: select SteamVR on a profile's Input tab, save the configuration, then use Controller bindings to choose the physical VR-controller button. Closing SteamVR must leave this application running and waiting for reconnection.
 
 The application is self-contained and does not require a separately installed .NET runtime.
-Microsoft Edge WebView2 Runtime is still required. It is normally included with current Windows 10 and Windows 11 installations.
 Only the ASR native runtimes required by the currently enabled providers and selected CPU/Vulkan backends are bundled by default. Other runtimes can be installed from the Models page.
 Source release builds may contain no ASR models or native runtimes. Install the required components from the Models page before starting recognition.
 "@
@@ -502,18 +495,18 @@ Source release builds may contain no ASR models or native runtimes. Install the 
     $testingNotes,
     [System.Text.UTF8Encoding]::new($false))
 
-Write-Host "[5/6] Generating SHA-256 package manifest..."
+Write-Host "[4/5] Generating SHA-256 package manifest..."
 Write-PackageManifest -Directory $packageDirectory
 
 if (!$SkipArchive) {
-    Write-Host "[6/6] Creating ZIP archive..."
+    Write-Host "[5/5] Creating ZIP archive..."
     $tar = Get-Command "tar.exe" -ErrorAction Stop
     Invoke-CheckedCommand -Command $tar.Source -Arguments @(
         "-a", "-c", "-f", $archivePath, $packageName
     ) -WorkingDirectory $outputRoot
 }
 else {
-    Write-Host "[6/6] ZIP creation skipped."
+    Write-Host "[5/5] ZIP creation skipped."
 }
 
 $exePath = Join-Path $packageDirectory "VRChatVoiceInput.App.exe"

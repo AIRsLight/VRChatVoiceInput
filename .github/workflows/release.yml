@@ -23,13 +23,6 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: src/VRChatVoiceInput.App/WebUI/package-lock.json
-
       - name: Fetch pinned OpenVR native dependency
         shell: pwsh
         run: ./fetch-openvr.ps1

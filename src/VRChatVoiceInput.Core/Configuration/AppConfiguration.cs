@@ -85,9 +85,6 @@ public sealed class AppConfiguration
 
 public sealed class ApplicationHostConfiguration
 {
-    [JsonPropertyName("settingsInterface")]
-    public string SettingsInterface { get; init; } = "native-wpf";
-
     [JsonPropertyName("uiLanguage")]
     public string UiLanguage { get; init; } = "auto";
 

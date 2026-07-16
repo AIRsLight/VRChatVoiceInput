@@ -5,7 +5,7 @@
 Configuration is split into global runtime definitions and application profiles:
 
 - `schemaVersion`: configuration contract version; currently `1`.
-- `application`: desktop lifecycle, settings-interface, and interface-language settings.
+- `application`: desktop lifecycle and interface-language settings.
 - `audio`: global microphone and recording-duration defaults inherited by profiles.
 - `asr`: installed provider executables and model paths.
 - `profiles`: application matching and per-application behavior.
@@ -14,11 +14,9 @@ Provider model paths are global so multiple profiles can reuse one loaded model 
 
 ## Interface language
 
-`application.settingsInterface` accepts `webview` or `native-wpf`. `native-wpf` is the default, while `webview` remains available as a compatibility interface. The General page persists the selection for the next settings window; `--native-ui` and `--web-ui` override it for the current application process without rewriting the preference.
+`application.uiLanguage` accepts `auto`, `zh`, `ja`, or `en`. `auto` maps Chinese, Japanese, and English Windows UI cultures to the corresponding interface; every unsupported system language falls back to English. The General page allows this value to be changed manually. The WPF settings UI, message-box titles, and tray menu use the same setting.
 
-`application.uiLanguage` accepts `auto`, `zh`, `ja`, or `en`. `auto` maps Chinese, Japanese, and English Windows UI cultures to the corresponding interface; every unsupported system language falls back to English. The General page allows this value to be changed manually. The WebView settings UI, loading screen, message-box titles, and tray menu use the same setting.
-
-When `application.closeToTray` is `true`, closing the settings window keeps the native PTT/ASR service and tray icon running but disposes the selected settings surface. Closing WebView2 also releases its browser process. Opening settings from the tray creates a fresh window using the saved interface preference. Pending debounced configuration changes are saved before disposal; a validation or write failure keeps the window open.
+When `application.closeToTray` is `true`, closing the settings window keeps the native PTT/ASR service and tray icon running but disposes the WPF window. Opening settings from the tray creates a fresh window. Pending debounced configuration changes are saved before disposal; a validation or write failure keeps the window open.
 
 ## Profile selection
 
@@ -89,7 +87,7 @@ Keyboard chord:
 
 `virtualKeys` contains Windows virtual-key codes. `[119]` is F8, `[20]` is Caps Lock, and `[17, 119]` is Ctrl+F8. The older single `virtualKey` field remains supported.
 
-The desktop editor captures keyboard chords through a native `WH_KEYBOARD_LL` hook. WebView2 only starts the capture and displays the returned key names. This supports any key exposed by Windows as a virtual key, including left/right modifiers, Windows keys, media keys, OEM punctuation keys, Print Screen, and numpad keys. Hardware-only `Fn` keys and secure attention sequences such as Ctrl+Alt+Delete are not ordinary virtual-key input and cannot be bound.
+The desktop editor captures keyboard chords through a native `WH_KEYBOARD_LL` hook. This supports any key exposed by Windows as a virtual key, including left/right modifiers, Windows keys, media keys, OEM punctuation keys, Print Screen, and numpad keys. Hardware-only `Fn` keys and secure attention sequences such as Ctrl+Alt+Delete are not ordinary virtual-key input and cannot be bound.
 
 Mouse button:
 
@@ -287,4 +285,4 @@ In automatic foreground routing mode, each profile's provider is created on its 
 
 ## Microphone test
 
-General > Audio includes a native microphone test. Starting it enumerates every active Windows capture endpoint and reports each endpoint's peak level every 100 ms. The WebView only renders those values; it does not open or retain audio files. The monitor stops when the button is pressed again or when the settings window closes.
+General > Audio includes a native microphone test. Starting it enumerates every active Windows capture endpoint and reports each endpoint's peak level every 100 ms. The WPF interface renders those values without opening or retaining audio files. The monitor stops when the button is pressed again or when the settings window closes.

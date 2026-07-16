@@ -31,6 +31,7 @@ public sealed class RuntimeController : IAsyncDisposable
     public RuntimeController(string configurationPath)
     {
         ConfigurationPath = Path.GetFullPath(configurationPath);
+        RemoveLegacySettingsInterface(ConfigurationPath);
         MigrateLegacyProfileNames(ConfigurationPath);
         MigrateVrChatDefaultInput(ConfigurationPath);
         EnsureVrChatDesktopProfile(ConfigurationPath);
@@ -240,59 +241,6 @@ public sealed class RuntimeController : IAsyncDisposable
                     exception: exception);
             }
         }
-    }
-
-    public object CreateSnapshot(string webViewVersion)
-    {
-        var configurationJson = File.ReadAllText(ConfigurationPath);
-        var configuration = AppConfiguration.Parse(configurationJson);
-        _ = configuration.GetEffectiveProfiles();
-        IReadOnlyList<AudioDeviceInfo> microphones;
-        try
-        {
-            microphones = WasapiAudioRecorder.ListCaptureDevices();
-        }
-        catch (Exception exception)
-        {
-            microphones = Array.Empty<AudioDeviceInfo>();
-            AddHostLog("warning", $"Unable to enumerate microphones: {exception.Message}");
-        }
-
-        RuntimeLogEventArgs[] logs;
-        object diagnostics;
-        lock (_logs)
-        {
-            logs = _logs.ToArray();
-            diagnostics = CreateDiagnosticMetrics();
-        }
-
-        return new
-        {
-            configuration = JsonNode.Parse(configurationJson),
-            runtime = new { isRunning = IsRunning, profileOverride = _profileOverride },
-            environment = new
-            {
-                configurationPath = ConfigurationPath,
-                logFilePath = AppFileLogger.CurrentLogPath,
-                applicationVersion = ApplicationVersion.Current,
-                repositoryUrl = ProjectLinks.RepositoryUrl,
-                webViewVersion
-            },
-            microphones,
-            runningApplications = ForegroundApplicationInspector.ListApplications(),
-            gpuDevices = VulkanDeviceInspector.ListDevices(),
-            microphoneTest = new
-            {
-                isRunning = _microphoneLevelMonitor is not null,
-                levels = _microphoneLevelMonitor?.CurrentLevels ?? Array.Empty<MicrophoneLevelInfo>()
-            },
-            providerStatuses = AsrProviderFactory.CheckAvailability(configuration.Asr),
-            modelAssets = ModelDownloadCatalog.GetAssetStatuses(),
-            modelDownload = _modelDownloads.Current,
-            steamVr = SteamVrPttInput.GetRuntimeStatus(),
-            diagnostics,
-            logs
-        };
     }
 
     public object GetDiagnosticMetrics()
@@ -607,6 +555,20 @@ public sealed class RuntimeController : IAsyncDisposable
     {
         using var document = JsonDocument.Parse(json);
         return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private static void RemoveLegacySettingsInterface(string path)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
+        var application = root?["application"] as JsonObject;
+        if (root is null || application?.Remove("settingsInterface") != true)
+        {
+            return;
+        }
+
+        var temporaryPath = path + ".settings-interface-migration.tmp";
+        File.WriteAllText(temporaryPath, FormatJson(root.ToJsonString()));
+        File.Move(temporaryPath, path, overwrite: true);
     }
 
     private static void MigrateLegacyProfileNames(string path)

@@ -16,8 +16,8 @@ The current default is the local Paraformer Q5_0 GGUF provider on CPU. Q8_0 and 
 - Global keyboard, five-button mouse, XInput, and SteamVR action hold-to-talk with WASAPI microphone capture.
 - Captured-window chat workflow with open hotkey, configurable delay, clipboard/Unicode/keyboard input, submit hotkey, and focus-change protection.
 - Provider capability and recognition-option contracts with deferred terminology-hint support.
-- Per-application profiles with a running-process picker, dynamic foreground fallback, native keyboard/XInput binding capture, provider selection, hotwords, output method, and submission hotkeys. Windows input hooks perform capture independently of the selected settings interface.
-- Parallel native WPF and WebView2 settings interfaces with automatic configuration saves, tray lifecycle, runtime control, preset/model editors, live process memory and recognition timing diagnostics, per-preset output testing, and runtime logs. Native WPF is the default interface; `application.settingsInterface` can select the WebView2 compatibility interface, while `--native-ui` and `--web-ui` provide one-run overrides. Native, model, bridge, WPF, and WebView failures are written to daily files under `%LocalAppData%\VRChatVoiceInput\Logs` and retained for 14 days.
+- Per-application profiles with a running-process picker, dynamic foreground fallback, native keyboard/XInput binding capture, provider selection, hotwords, output method, and submission hotkeys.
+- Native WPF settings interface with automatic configuration saves, tray lifecycle, runtime control, preset/model editors, live process memory and recognition timing diagnostics, per-preset output testing, and runtime logs. Native, model, provider, and WPF failures are written to daily files under `%LocalAppData%\VRChatVoiceInput\Logs` and retained for 14 days.
 - Explicit runtime profile activation, per-profile microphone overrides, and installed-model availability checks.
 - Live native level meters for every active microphone.
 - Enumerated Vulkan GPU selection for the bundled SenseVoice and whisper.cpp Vulkan runtimes, including Intel and AMD integrated adapters exposed by the Windows graphics driver.
@@ -30,21 +30,17 @@ The staged implementation plan, including global keyboard/gamepad PTT and safe t
 
 The application profile schema is documented in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
-The parallel native WPF and WebView2 configuration architecture is documented in [docs/UI_ARCHITECTURE.md](docs/UI_ARCHITECTURE.md).
+The native WPF configuration architecture is documented in [docs/UI_ARCHITECTURE.md](docs/UI_ARCHITECTURE.md).
 
 Initial CPU results for SenseVoice, Paraformer, Fun-ASR-Nano, Qwen3-ASR, and whisper.cpp are recorded in [docs/MODEL_BENCHMARK.md](docs/MODEL_BENCHMARK.md).
 
 ## Quick start
 
-1. Fetch the pinned OpenVR native dependency and build the WebUI. Native binaries,
-model weights, and generated WebUI output are intentionally not stored in Git:
+1. Fetch the pinned OpenVR native dependency. Native binaries and model weights
+are intentionally not stored in Git:
 
 ```powershell
 .\fetch-openvr.ps1
-Push-Location src\VRChatVoiceInput.App\WebUI
-npm ci
-npm run build
-Pop-Location
 ```
 
 2. Copy `appsettings.example.json` to `appsettings.json`.
@@ -90,14 +86,6 @@ dotnet run --project src/VRChatVoiceInput.Cli -- --config appsettings.json --sel
 ```powershell
 dotnet run --project src/VRChatVoiceInput.App -c Release -- --config appsettings.json
 ```
-
-To try the native WPF settings surface without changing the saved preference:
-
-```powershell
-dotnet run --project src/VRChatVoiceInput.App -c Release -- --native-ui --config appsettings.json
-```
-
-Use `--web-ui` to force the existing WebView2 surface. The General page can persist either choice for subsequent settings windows.
 
 The development build can also be opened directly at `src/VRChatVoiceInput.App/bin/Release/net8.0-windows/VRChatVoiceInput.App.exe`. It searches its parent directories for the repository `appsettings.json`.
 
@@ -183,7 +171,7 @@ To include every provider model referenced by `appsettings.json`, include every 
 .\build-portable.ps1 -ModelSet all -RuntimeSet all
 ```
 
-The target computer does not need a separately installed .NET runtime. It does need Microsoft Edge WebView2 Runtime, which is normally already installed on current Windows 10 and Windows 11 systems.
+The target computer does not need a separately installed .NET runtime or browser runtime.
 
 For a source-only portable shell that downloads its selected models and runtimes
 after first launch, use:
@@ -196,14 +184,13 @@ after first launch, use:
 
 The repository contains source, patches, documentation, configuration examples,
 and static application assets. Native DLL/EXE files, model weights, recordings,
-archives, local configuration, generated WebUI output, and build products are
+archives, local configuration, and build products are
 excluded by `.gitignore`. `fetch-openvr.ps1` retrieves the pinned Valve OpenVR
 DLL with size and SHA-256 verification.
 
 GitHub Actions provides:
 
-- `CI`: WebUI type checking/build plus .NET restore, build, and tests on pushes
-  and pull requests.
+- `CI`: .NET restore, build, and tests on pushes and pull requests.
 - `Portable release`: a manually triggered or `v*` tag-triggered source-only
   portable ZIP. Tagged runs also publish the ZIP as a GitHub release asset.
 
@@ -219,5 +206,5 @@ GitHub Actions provides:
 - Segmented recognition and OSC Chatbox streaming updates: implemented.
 - Extended HID gamepad input: planned next.
 - Application profiles and configurable submission hotkeys: implemented.
-- WPF/WebView2 settings application and tray lifecycle: implemented.
+- Native WPF settings application and tray lifecycle: implemented.
 - Clipboard-based text injection with best-effort clipboard restoration: implemented.

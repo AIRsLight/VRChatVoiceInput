@@ -45,11 +45,6 @@ public partial class NativeMainWindow
         content.Children.Add(Section(
             T("Interface language"),
             T("Unsupported system languages fall back to English."),
-            Field(T("Settings interface"), BoundCombo("application.settingsInterface", new[]
-            {
-                new Option("webview", "WebView2"),
-                new Option("native-wpf", "Native WPF")
-            }, fallback: "native-wpf"), T("The selected interface is used the next time settings are opened.")),
             Field(T("Interface language"), language)));
 
         var microphones = GetMicrophones();
