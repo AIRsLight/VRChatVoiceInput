@@ -127,10 +127,24 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         ProfilesNavText.Text = T("Profiles");
         ModelsNavText.Text = T("Models");
         DiagnosticsNavText.Text = T("Diagnostics");
+        RepositoryButtonText.Text = T("Project repository");
+        RepositoryButton.ToolTip = T("Project repository");
         VersionText.Text = $"App {ApplicationVersion.Current}";
     }
 
     private string T(string key) => NativeWpfLocalization.Translate(GetString("application.uiLanguage", "auto"), key);
+
+    private void OnOpenProjectRepository(object sender, RoutedEventArgs eventArgs)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(ProjectLinks.RepositoryUrl) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            ShowError(exception);
+        }
+    }
 
     private void OnNavigate(object sender, RoutedEventArgs eventArgs)
     {

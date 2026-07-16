@@ -144,6 +144,30 @@ button {
   line-height: 1.6;
 }
 
+.repository-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  margin: 7px -6px 0;
+  padding: 0 6px;
+  border-radius: 5px;
+  color: #dce3df;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.repository-link:hover {
+  background: #2b3530;
+  color: white;
+}
+
+.repository-link svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
 .main {
   display: grid;
   grid-template-rows: 64px minmax(0, 1fr);

@@ -518,6 +518,19 @@
                     <StackPanel>
                         <TextBlock x:Name="VersionText" Foreground="#AEB9B2" FontSize="11" />
                         <TextBlock Text="Native WPF" Foreground="#AEB9B2" FontSize="11" Margin="0,3,0,0" />
+                        <Button x:Name="RepositoryButton" Style="{StaticResource NavButtonStyle}"
+                                Height="30" Margin="-6,7,-6,0" Padding="6,0"
+                                Click="OnOpenProjectRepository">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{x:Static local:MaterialIconPaths.GitHub}" Width="14" Height="14"
+                                      Stretch="Uniform"
+                                      Fill="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                      VerticalAlignment="Center" />
+                                <TextBlock x:Name="RepositoryButtonText" Text="Project repository"
+                                           Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                           FontSize="11" Margin="7,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
             </Grid>

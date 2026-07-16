@@ -275,6 +275,7 @@ public sealed class RuntimeController : IAsyncDisposable
                 configurationPath = ConfigurationPath,
                 logFilePath = AppFileLogger.CurrentLogPath,
                 applicationVersion = ApplicationVersion.Current,
+                repositoryUrl = ProjectLinks.RepositoryUrl,
                 webViewVersion
             },
             microphones,

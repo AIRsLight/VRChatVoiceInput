@@ -246,6 +246,7 @@ interface Snapshot {
     configurationPath: string;
     logFilePath: string;
     applicationVersion: string;
+    repositoryUrl: string;
     webViewVersion: string;
   };
   microphones: Array<{ id: string; name: string }>;
@@ -742,6 +743,10 @@ function render(): void {
       <div class="sidebar-footer">
         <div>App ${escapeHtml(snapshot.environment.applicationVersion)}</div>
         <div>WebView ${escapeHtml(snapshot.environment.webViewVersion.split(" ")[0])}</div>
+        <a class="repository-link" href="${escapeHtml(snapshot.environment.repositoryUrl)}"
+           target="_blank" rel="noopener noreferrer" title="${t("Project repository")}">
+          ${icon("github")}<span>${t("Project repository")}</span>
+        </a>
       </div>
     </aside>
     <main class="main">
