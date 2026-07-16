@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="NAudio" Version="2.3.0" />
     <ProjectReference Include="..\VRChatVoiceInput.Core\VRChatVoiceInput.Core.csproj" />
     <ProjectReference Include="..\VRChatVoiceInput.OpenVR\VRChatVoiceInput.OpenVR.csproj" />
     <EmbeddedResource Include="SteamVR\*.json" />
