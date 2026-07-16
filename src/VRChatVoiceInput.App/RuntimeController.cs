@@ -16,6 +16,8 @@ public sealed class RuntimeController : IAsyncDisposable
 {
     private const int MaximumLogEntries = 300;
     private const string VrChatTemplateId = "vrchat";
+    private const int VrChatTemplateVersion = 2;
+    private const string DesktopDefaultProfileName = "Desktop default";
     private const string VrChatDesktopProfileName = "VRCHAT Desktop";
     private const string VrChatDesktopTemplateId = "vrchat-desktop";
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -33,8 +35,7 @@ public sealed class RuntimeController : IAsyncDisposable
         ConfigurationPath = Path.GetFullPath(configurationPath);
         RemoveLegacySettingsInterface(ConfigurationPath);
         MigrateLegacyProfileNames(ConfigurationPath);
-        MigrateVrChatDefaultInput(ConfigurationPath);
-        EnsureVrChatDesktopProfile(ConfigurationPath);
+        MigrateProfileInputsAndBuiltIns(ConfigurationPath);
         _profileOverride = LoadConfiguration().GetEffectiveDefaultProfileId();
     }
 
@@ -655,144 +656,178 @@ public sealed class RuntimeController : IAsyncDisposable
         File.Move(temporaryPath, path, overwrite: true);
     }
 
-    private static void EnsureVrChatDesktopProfile(string path)
+    private static void MigrateProfileInputsAndBuiltIns(string path)
     {
         var root = JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
-        var items = root?["profiles"]?["items"] as JsonArray;
-        if (root is null || items is null || items.OfType<JsonObject>().Any(item =>
-                string.Equals(
-                    item["id"]?.GetValue<string>(),
-                    VrChatDesktopProfileName,
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(
-                    item["builtInTemplate"]?.GetValue<string>(),
-                    VrChatDesktopTemplateId,
-                    StringComparison.OrdinalIgnoreCase)))
+        var profiles = root?["profiles"] as JsonObject;
+        var items = profiles?["items"] as JsonArray;
+        if (root is null || profiles is null || items is null)
         {
             return;
         }
 
-        var source = items.OfType<JsonObject>().FirstOrDefault(item => string.Equals(
-                         item["id"]?.GetValue<string>(),
-                         "VRChat",
-                         StringComparison.OrdinalIgnoreCase))
-                     ?? items.OfType<JsonObject>().FirstOrDefault(item => string.Equals(
-                         item["output"]?["mode"]?.GetValue<string>(),
-                         "vrchat-osc",
-                         StringComparison.OrdinalIgnoreCase));
-        var profile = source?.DeepClone().AsObject() ?? new JsonObject();
-        profile["id"] = VrChatDesktopProfileName;
-        profile["builtInTemplate"] = VrChatDesktopTemplateId;
-        profile.Remove("displayName");
-        profile["enabled"] = true;
-        profile["builtIn"] = true;
-        profile["audio"] ??= new JsonObject
+        var changed = false;
+        foreach (var profile in items.OfType<JsonObject>())
         {
-            ["deviceId"] = null,
-            ["minimumDurationMs"] = null
-        };
-        profile["match"] = new JsonObject
-        {
-            ["processNames"] = new JsonArray { "VRChat.exe" }
-        };
+            var input = profile["input"] as JsonObject ?? new JsonObject();
+            profile["input"] = input;
+            if (input["modes"] is not JsonArray { Count: > 0 })
+            {
+                var legacyMode = input["mode"]?.GetValue<string>();
+                input["modes"] = new JsonArray(
+                    string.IsNullOrWhiteSpace(legacyMode) ? "keyboard" : legacyMode.Trim().ToLowerInvariant());
+                changed = true;
+            }
 
-        var input = profile["input"] as JsonObject ?? new JsonObject();
-        profile["input"] = input;
-        input["mode"] = "keyboard";
-        input["keyboard"] = new JsonObject
-        {
-            ["virtualKeys"] = new JsonArray { 0xA2 },
-            ["suppressKey"] = false
-        };
-        input["mouse"] ??= new JsonObject
-        {
-            ["button"] = "x1",
-            ["suppressButton"] = false
-        };
-        input["gamepad"] ??= new JsonObject
-        {
-            ["userIndex"] = 0,
-            ["buttonMask"] = 0x1000,
-            ["pollIntervalMs"] = 8
-        };
-        input["steamVr"] ??= new JsonObject
-        {
-            ["actionPath"] = "/actions/voiceinput/in/ptt",
-            ["pollIntervalMs"] = 8
-        };
+            changed |= input.Remove("mode");
+        }
 
-        var recognition = profile["recognition"] as JsonObject ?? new JsonObject();
-        profile["recognition"] = recognition;
-        recognition["provider"] ??= root["asr"]?["provider"]?.DeepClone() ?? "paraformer-gguf";
-        recognition["language"] ??= "auto";
-        recognition["hotwords"] ??= new JsonArray();
-        recognition["streamingEnabled"] ??= false;
+        var profileObjects = items.OfType<JsonObject>().ToArray();
+        var vrChatProfile = profileObjects.FirstOrDefault(profile => string.Equals(
+                                profile["builtInTemplate"]?.GetValue<string>(),
+                                VrChatTemplateId,
+                                StringComparison.OrdinalIgnoreCase))
+                            ?? profileObjects.FirstOrDefault(profile =>
+                                profile["builtIn"]?.GetValue<bool>() == true &&
+                                string.Equals(
+                                    profile["id"]?.GetValue<string>(),
+                                    "VRChat",
+                                    StringComparison.OrdinalIgnoreCase));
+        var legacyDesktopProfiles = profileObjects.Where(profile => string.Equals(
+                    profile["builtInTemplate"]?.GetValue<string>(),
+                    VrChatDesktopTemplateId,
+                    StringComparison.OrdinalIgnoreCase) ||
+                (profile["builtIn"]?.GetValue<bool>() == true &&
+                 string.Equals(
+                     profile["id"]?.GetValue<string>(),
+                     VrChatDesktopProfileName,
+                     StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
 
-        var output = profile["output"] as JsonObject ?? new JsonObject();
-        profile["output"] = output;
-        output["mode"] = "vrchat-osc";
-        output["vrChat"] ??= root["vrChat"]?.DeepClone() ?? new JsonObject
+        if (vrChatProfile is null && legacyDesktopProfiles.Length > 0)
         {
-            ["host"] = "127.0.0.1",
-            ["port"] = 9000,
-            ["sendImmediately"] = true,
-            ["maxChatboxCharacters"] = 144
-        };
+            vrChatProfile = legacyDesktopProfiles[0];
+            legacyDesktopProfiles = legacyDesktopProfiles.Skip(1).ToArray();
+            var previousId = vrChatProfile["id"]?.GetValue<string>();
+            if (!profileObjects.Any(profile => !ReferenceEquals(profile, vrChatProfile) && string.Equals(
+                    profile["id"]?.GetValue<string>(),
+                    "VRChat",
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                vrChatProfile["id"] = "VRChat";
+                if (string.Equals(
+                        profiles["defaultProfileId"]?.GetValue<string>(),
+                        previousId,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    profiles["defaultProfileId"] = "VRChat";
+                }
+            }
 
-        items.Add(profile);
-        var temporaryPath = path + ".built-in-profile.tmp";
+            changed = true;
+        }
+
+        if (vrChatProfile is not null)
+        {
+            var templateVersion = vrChatProfile["builtInTemplateVersion"]?.GetValue<int>() ?? 0;
+            if (!string.Equals(
+                    vrChatProfile["builtInTemplate"]?.GetValue<string>(),
+                    VrChatTemplateId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                vrChatProfile["builtInTemplate"] = VrChatTemplateId;
+                changed = true;
+            }
+
+            if (templateVersion < VrChatTemplateVersion)
+            {
+                var input = vrChatProfile["input"]!.AsObject();
+                var legacyKeyboard = legacyDesktopProfiles.FirstOrDefault()?["input"]?["keyboard"];
+                if (legacyKeyboard is not null)
+                {
+                    input["keyboard"] = legacyKeyboard.DeepClone();
+                }
+                else if (UsesLegacyDefaultF8(input["keyboard"] as JsonObject))
+                {
+                    input["keyboard"] = new JsonObject
+                    {
+                        ["virtualKeys"] = new JsonArray { 0xA2 },
+                        ["suppressKey"] = false
+                    };
+                }
+
+                var enabledModes = input["modes"]!.AsArray()
+                    .Select(node => node?.GetValue<string>())
+                    .Where(mode => !string.IsNullOrWhiteSpace(mode))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                enabledModes.Add("keyboard");
+                enabledModes.Add("steamvr");
+                input["modes"] = new JsonArray(
+                    new[] { "keyboard", "mouse", "xinput", "steamvr" }
+                        .Where(enabledModes.Contains)
+                        .Select(mode => JsonValue.Create(mode))
+                        .ToArray());
+                input["steamVr"] ??= new JsonObject
+                {
+                    ["actionPath"] = "/actions/voiceinput/in/ptt",
+                    ["pollIntervalMs"] = 8
+                };
+                vrChatProfile["builtInTemplateVersion"] = VrChatTemplateVersion;
+                changed = true;
+            }
+
+            if (vrChatProfile["builtIn"]?.GetValue<bool>() != true)
+            {
+                vrChatProfile["builtIn"] = true;
+                changed = true;
+            }
+        }
+
+        foreach (var legacyDesktopProfile in legacyDesktopProfiles)
+        {
+            var legacyId = legacyDesktopProfile["id"]?.GetValue<string>();
+            if (vrChatProfile is not null && string.Equals(
+                    profiles["defaultProfileId"]?.GetValue<string>(),
+                    legacyId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                profiles["defaultProfileId"] = vrChatProfile["id"]?.GetValue<string>() ?? "VRChat";
+            }
+
+            items.Remove(legacyDesktopProfile);
+            changed = true;
+        }
+
+        var desktopDefault = items.OfType<JsonObject>().FirstOrDefault(profile =>
+            string.Equals(
+                profile["id"]?.GetValue<string>(),
+                DesktopDefaultProfileName,
+                StringComparison.OrdinalIgnoreCase) &&
+            profile["builtInTemplate"] is null);
+        if (desktopDefault?["builtIn"]?.GetValue<bool>() == true)
+        {
+            desktopDefault["builtIn"] = false;
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        var temporaryPath = path + ".profile-input-migration.tmp";
         File.WriteAllText(temporaryPath, FormatJson(root.ToJsonString()));
         File.Move(temporaryPath, path, overwrite: true);
     }
 
-    private static void MigrateVrChatDefaultInput(string path)
+    private static bool UsesLegacyDefaultF8(JsonObject? keyboard)
     {
-        var root = JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
-        var items = root?["profiles"]?["items"] as JsonArray;
-        var profile = items?.OfType<JsonObject>().FirstOrDefault(item => string.Equals(
-                              item["builtInTemplate"]?.GetValue<string>(),
-                              VrChatTemplateId,
-                              StringComparison.OrdinalIgnoreCase))
-                      ?? items?.OfType<JsonObject>().FirstOrDefault(item =>
-                          item["builtIn"]?.GetValue<bool>() == true &&
-                          string.Equals(
-                              item["id"]?.GetValue<string>(),
-                              "VRChat",
-                              StringComparison.OrdinalIgnoreCase));
-        if (root is null || profile is null || string.Equals(
-                profile["builtInTemplate"]?.GetValue<string>(),
-                VrChatTemplateId,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        profile["builtInTemplate"] = VrChatTemplateId;
-        var input = profile["input"] as JsonObject;
-        var keyboard = input?["keyboard"] as JsonObject;
         var virtualKeys = keyboard?["virtualKeys"] as JsonArray;
         var usesF8 = virtualKeys is { Count: 1 }
             ? virtualKeys[0]?.GetValue<int>() == 0x77
             : (virtualKeys is null or { Count: 0 }) &&
               (keyboard?["virtualKey"]?.GetValue<int>() ?? 0x77) == 0x77;
-        var usesLegacyDefaultF8 = string.Equals(
-                                      input?["mode"]?.GetValue<string>(),
-                                      "keyboard",
-                                      StringComparison.OrdinalIgnoreCase) &&
-                                  keyboard?["suppressKey"]?.GetValue<bool>() != true &&
-                                  usesF8;
-        if (usesLegacyDefaultF8 && input is not null)
-        {
-            input["mode"] = "steamvr";
-            var steamVr = input["steamVr"] as JsonObject ?? new JsonObject();
-            input["steamVr"] = steamVr;
-            steamVr["actionPath"] = "/actions/voiceinput/in/ptt";
-            steamVr["pollIntervalMs"] ??= 8;
-        }
-
-        var temporaryPath = path + ".vrchat-input-migration.tmp";
-        File.WriteAllText(temporaryPath, FormatJson(root.ToJsonString()));
-        File.Move(temporaryPath, path, overwrite: true);
+        return keyboard?["suppressKey"]?.GetValue<bool>() != true && usesF8;
     }
 
     private static void EnsureRuntimeReady(AppConfiguration configuration, string? profileOverride)

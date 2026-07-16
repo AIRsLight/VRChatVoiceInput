@@ -200,8 +200,9 @@ GitHub Actions provides:
 
 - Global Windows keyboard hold-to-talk: implemented for configurable key chords.
 - Global Windows mouse hold-to-talk: implemented for left, right, middle, and both side buttons.
-- Xbox-compatible gamepad hold-to-talk: implemented through XInput; select it with `input.mode: xinput`.
-- SteamVR controller hold-to-talk: implemented as an OpenVR background action client with bundled action manifests and controller bindings; select it with `input.mode: steamvr`.
+- Multiple simultaneous hold-to-talk bindings per profile: configure one or more values in `input.modes`; keyboard, mouse, XInput, and SteamVR inputs are aggregated into one recording session.
+- Xbox-compatible gamepad hold-to-talk: implemented through XInput; enable it with `xinput` in `input.modes`.
+- SteamVR controller hold-to-talk: implemented as an OpenVR background action client with bundled action manifests and controller bindings; enable it with `steamvr` in `input.modes`.
 - WASAPI recording: implemented with default or explicit capture-device selection.
 - Captured foreground-window output: implemented with clipboard paste, Unicode `SendInput`, pure keyboard events, open/submit hotkeys, delay, and focus-change protection.
 - VRChat OSC output: implemented.

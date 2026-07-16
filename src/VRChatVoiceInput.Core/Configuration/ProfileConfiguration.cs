@@ -71,6 +71,10 @@ public sealed class ProfileRecognitionConfiguration
 
 internal static class ProfileConfigurationValidator
 {
+    private static readonly HashSet<string> SupportedInputModes = new(
+        ["keyboard", "mouse", "xinput", "steamvr"],
+        StringComparer.OrdinalIgnoreCase);
+
     public static void Validate(
         IReadOnlyList<ApplicationProfileConfiguration> profiles,
         string defaultProfileId)
@@ -109,7 +113,27 @@ internal static class ProfileConfigurationValidator
                     $"Profile '{profile.Id}' minimum recording duration must be greater than zero.");
             }
 
-            if (string.Equals(profile.Input.Mode, "steamvr", StringComparison.OrdinalIgnoreCase))
+            var inputModes = profile.Input.GetEffectiveModes();
+            if (inputModes.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Profile '{profile.Id}' must enable at least one input mode.");
+            }
+
+            if (inputModes.Distinct(StringComparer.OrdinalIgnoreCase).Count() != inputModes.Count)
+            {
+                throw new InvalidOperationException(
+                    $"Profile '{profile.Id}' contains duplicate input modes.");
+            }
+
+            var unsupportedInputMode = inputModes.FirstOrDefault(mode => !SupportedInputModes.Contains(mode));
+            if (unsupportedInputMode is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Profile '{profile.Id}' has unsupported input mode '{unsupportedInputMode}'.");
+            }
+
+            if (inputModes.Contains("steamvr", StringComparer.OrdinalIgnoreCase))
             {
                 if (!string.Equals(
                         profile.Input.SteamVr.ActionPath,

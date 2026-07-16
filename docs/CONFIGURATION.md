@@ -63,9 +63,9 @@ Selecting a row in the desktop profile editor only opens it for editing. `Use pr
 
 `id` is both the profile name shown in the interface and its unique configuration identifier. Names may contain spaces and non-ASCII characters but cannot be empty or duplicated case-insensitively. `builtIn` identifies profiles shipped by the application. It does not make a profile immutable in the JSON configuration.
 
-The built-in `VRChat` profile uses the SteamVR PTT action and sends recognized text through the VRChat OSC Chatbox output. Existing profiles that still use the old built-in F8 default are migrated to SteamVR; customized input bindings are preserved.
+The only protected built-in profile is `VRChat`. It matches `VRChat.exe`, enables both left Ctrl (`VK_LCONTROL`, `0xA2`) and the SteamVR PTT action, and sends recognized text through the VRChat OSC Chatbox output. The shipped `Desktop default` starter remains available for foreground-window output but is an ordinary profile that can be duplicated, renamed, or deleted.
 
-New and existing installations also include a built-in `VRCHAT Desktop` profile. It matches `VRChat.exe`, uses left Ctrl (`VK_LCONTROL`, `0xA2`) as its keyboard PTT trigger, and uses the same VRChat OSC output. Existing installations receive it without overwriting an already configured profile with the same name.
+Existing installations migrate the former built-in `VRCHAT Desktop` profile into `VRChat`: its keyboard binding is preserved, keyboard and SteamVR triggers are enabled together, references to it as the default profile are redirected to `VRChat`, and the redundant built-in profile is removed. Other custom profiles are not merged or deleted.
 
 ## Profile microphone
 
@@ -75,11 +75,29 @@ New and existing installations also include a built-in `VRCHAT Desktop` profile.
 
 ## PTT input
 
+`input.modes` enables one or more trigger adapters in the same profile. Pressing any enabled binding starts one recording session; when bindings overlap, recording ends only after every pressed binding has been released. The legacy singular `input.mode` field remains readable and is migrated to a one-element `modes` array when the desktop application opens.
+
+Combined keyboard and SteamVR example:
+
+```json
+"input": {
+  "modes": ["keyboard", "steamvr"],
+  "keyboard": {
+    "virtualKeys": [162],
+    "suppressKey": false
+  },
+  "steamVr": {
+    "actionPath": "/actions/voiceinput/in/ptt",
+    "pollIntervalMs": 8
+  }
+}
+```
+
 Keyboard chord:
 
 ```json
 "input": {
-  "mode": "keyboard",
+  "modes": ["keyboard"],
   "keyboard": {
     "virtualKeys": [17, 119],
     "suppressKey": false
@@ -95,7 +113,7 @@ Mouse button:
 
 ```json
 "input": {
-  "mode": "mouse",
+  "modes": ["mouse"],
   "mouse": {
     "button": "x1",
     "suppressButton": false
@@ -109,7 +127,7 @@ XInput gamepad:
 
 ```json
 "input": {
-  "mode": "xinput",
+  "modes": ["xinput"],
   "gamepad": {
     "userIndex": 0,
     "buttonMask": 4096,
@@ -124,7 +142,7 @@ SteamVR action input:
 
 ```json
 "input": {
-  "mode": "steamvr",
+  "modes": ["steamvr"],
   "steamVr": {
     "actionPath": "/actions/voiceinput/in/ptt",
     "pollIntervalMs": 8
@@ -236,6 +254,8 @@ Implemented `textInputMethod` values:
 - `unicode-send-input`: inject UTF-16 keyboard events directly.
 - `keyboard`: type virtual-key events through the target keyboard layout; unsupported characters fail explicitly. Active IMEs can intercept these events, so use an English/direct-input layout for this mode.
 
+Window output uses synthetic keyboard input for text insertion and optional open/submit hotkeys. Anti-cheat software may classify this as input injection and may suspend or ban an account. Use `captured-window` only in applications where automated input is explicitly permitted. This warning does not apply to the global keyboard/mouse PTT listeners themselves or to `vrchat-osc` output.
+
 `openInput` uses `none` or `hotkey`. When enabled, its keys are pressed first and the runtime waits `openInputDelayMs` before inserting text. The delay accepts `0` through `5000` milliseconds.
 
 `submission` modes:
@@ -247,7 +267,7 @@ Common submission chords are `[13]` for Enter and `[17, 13]` for Ctrl+Enter. The
 
 ## VRChat output
 
-The built-in `vrchat` profile matches `VRChat.exe` and uses:
+The built-in `VRChat` profile matches `VRChat.exe` and uses:
 
 ```json
 "output": {

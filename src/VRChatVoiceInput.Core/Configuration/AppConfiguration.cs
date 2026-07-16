@@ -295,6 +295,9 @@ public sealed class AudioConfiguration
 
 public sealed class InputConfiguration
 {
+    [JsonPropertyName("modes")]
+    public IReadOnlyList<string> Modes { get; init; } = Array.Empty<string>();
+
     [JsonPropertyName("mode")]
     public string Mode { get; init; } = "keyboard";
 
@@ -309,6 +312,15 @@ public sealed class InputConfiguration
 
     [JsonPropertyName("steamVr")]
     public SteamVrInputConfiguration SteamVr { get; init; } = new();
+
+    public IReadOnlyList<string> GetEffectiveModes()
+    {
+        var configuredModes = Modes is { Count: > 0 } ? Modes : [Mode];
+        return configuredModes
+            .Where(mode => !string.IsNullOrWhiteSpace(mode))
+            .Select(mode => mode.Trim().ToLowerInvariant())
+            .ToArray();
+    }
 }
 
 public sealed class KeyboardInputConfiguration

@@ -300,21 +300,46 @@ public partial class NativeMainWindow
             Field(T("Profile name"), name),
             Field(T("Process names"), processRow, T("Leave empty to use the application that is in the foreground when PTT is pressed."))));
 
-        var mode = GetString($"{basePath}.input.mode", "keyboard");
-        var modeControl = SegmentedControl(
-            $"{basePath}.input.mode",
-            new[]
-            {
-                new Option("keyboard", T("Keyboard"), MaterialIconPaths.Keyboard),
-                new Option("mouse", T("Mouse"), MaterialIconPaths.Mouse),
-                new Option("xinput", T("Gamepad"), MaterialIconPaths.GamepadVariant),
-                new Option("steamvr", T("SteamVR"), MaterialIconPaths.Steam)
-            });
-        modeControl.Margin = new Thickness(0, 0, 0, 16);
+        var modes = profile["input"]!["modes"]!.AsArray()
+            .Select(node => node?.GetValue<string>())
+            .Where(mode => !string.IsNullOrWhiteSpace(mode))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var triggerOptions = new[]
+        {
+            new Option("keyboard", T("Keyboard"), MaterialIconPaths.Keyboard,
+                T("Listen for a global Windows keyboard chord.")),
+            new Option("mouse", T("Mouse"), MaterialIconPaths.Mouse,
+                T("Listen for a global Windows mouse button.")),
+            new Option("xinput", "XInput", MaterialIconPaths.GamepadVariant,
+                T("Poll an XInput controller button.")),
+            new Option("steamvr", T("SteamVR"), MaterialIconPaths.Steam,
+                T("Listen for the configured SteamVR controller action."))
+        };
         var triggerFields = new StackPanel();
-        triggerFields.Children.Add(modeControl);
-        triggerFields.Children.Add(BuildTriggerBinding(profile, basePath, mode));
-        content.Children.Add(Section(T("Push to talk"), T("Trigger binding"), triggerFields));
+        for (var index = 0; index < triggerOptions.Length; index++)
+        {
+            var option = triggerOptions[index];
+            var trigger = new StackPanel();
+            trigger.Children.Add(BuildTriggerModeToggle($"{basePath}.input.modes", option));
+            if (modes.Contains(option.Value))
+            {
+                var binding = BuildTriggerBinding(profile, basePath, option.Value);
+                binding.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 6, 0, 8));
+                trigger.Children.Add(binding);
+            }
+
+            triggerFields.Children.Add(new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xE1, 0xE5, 0xE2)),
+                BorderThickness = index == triggerOptions.Length - 1
+                    ? new Thickness(0)
+                    : new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(0, 2, 0, 8),
+                Margin = new Thickness(0, 0, 0, 6),
+                Child = trigger
+            });
+        }
+        content.Children.Add(Section(T("Push to talk"), T("Enable one or more trigger types."), triggerFields));
 
         var microphones = new List<Option> { new(string.Empty, T("Default communications device")) };
         microphones.AddRange(GetMicrophones().Select(device => new Option(device.Id, device.Name)));
@@ -323,7 +348,8 @@ public partial class NativeMainWindow
             ItemsSource = microphones,
             DisplayMemberPath = nameof(Option.Label),
             SelectedValuePath = nameof(Option.Value),
-            SelectedValue = GetString($"{basePath}.audio.deviceId")
+            SelectedValue = GetString($"{basePath}.audio.deviceId"),
+            ToolTip = T("Choose the microphone used by this profile. The default option inherits the global device.")
         };
         if (audioDevice.SelectedIndex < 0) audioDevice.SelectedIndex = 0;
         audioDevice.SelectionChanged += (_, _) =>
@@ -337,7 +363,12 @@ public partial class NativeMainWindow
             string.Empty,
             TwoColumns(
                 Field(T("Microphone"), audioDevice),
-                Field(T("Minimum recording (ms)"), BoundNumberBox($"{basePath}.audio.minimumDurationMs", 100, 5000, nullable: true)))));
+                Field(T("Minimum recording (ms)"), BoundNumberBox(
+                    $"{basePath}.audio.minimumDurationMs",
+                    100,
+                    5000,
+                    nullable: true,
+                    toolTip: T("Recordings shorter than this value are discarded. Empty inherits the global setting."))))));
         return content;
     }
 
@@ -353,9 +384,12 @@ public partial class NativeMainWindow
                 var capture = await _controller.CaptureKeyboardChordAsync();
                 Set($"{basePath}.input.keyboard.virtualKeys", new JsonArray(capture.VirtualKeys.Select(value => JsonValue.Create(value)).ToArray()));
                 MarkDirty(rebuild: true);
-            });
+            }, T("Press and release the keyboard shortcut to bind it."));
             stack.Children.Add(Field(T("Keyboard"), row));
-            stack.Children.Add(BoundCheckBox(T("Suppress trigger"), $"{basePath}.input.keyboard.suppressKey"));
+            stack.Children.Add(BoundCheckBox(
+                T("Suppress trigger"),
+                $"{basePath}.input.keyboard.suppressKey",
+                toolTip: T("Prevent the selected keyboard shortcut from reaching the foreground application while this profile is active.")));
         }
         else if (mode == "mouse")
         {
@@ -364,9 +398,12 @@ public partial class NativeMainWindow
                 var capture = await _controller.CaptureMouseButtonAsync();
                 Set($"{basePath}.input.mouse.button", capture.Button);
                 MarkDirty(rebuild: true);
-            });
+            }, T("Press and release the mouse button to bind it."));
             stack.Children.Add(Field(T("Mouse"), row));
-            stack.Children.Add(BoundCheckBox(T("Suppress trigger"), $"{basePath}.input.mouse.suppressButton"));
+            stack.Children.Add(BoundCheckBox(
+                T("Suppress trigger"),
+                $"{basePath}.input.mouse.suppressButton",
+                toolTip: T("Prevent the selected mouse button from reaching the foreground application while this profile is active.")));
         }
         else if (mode == "xinput")
         {
@@ -378,9 +415,13 @@ public partial class NativeMainWindow
                 Set($"{basePath}.input.gamepad.userIndex", capture.UserIndex);
                 Set($"{basePath}.input.gamepad.buttonMask", capture.ButtonMask);
                 MarkDirty(rebuild: true);
-            });
+            }, T("Press a button on any connected XInput controller to bind it."));
             stack.Children.Add(Field(T("Gamepad"), row));
-            stack.Children.Add(Field(T("Poll interval (ms)"), BoundNumberBox($"{basePath}.input.gamepad.pollIntervalMs", 1, 1000)));
+            stack.Children.Add(Field(T("Poll interval (ms)"), BoundNumberBox(
+                $"{basePath}.input.gamepad.pollIntervalMs",
+                1,
+                1000,
+                toolTip: T("Lower polling intervals respond faster but wake the CPU more often."))));
         }
         else
         {
@@ -400,9 +441,84 @@ public partial class NativeMainWindow
             buttons.Children.Add(refresh);
             buttons.Children.Add(bindings);
             stack.Children.Add(buttons);
-            stack.Children.Add(Field(T("Poll interval (ms)"), BoundNumberBox($"{basePath}.input.steamVr.pollIntervalMs", 1, 1000)));
+            stack.Children.Add(Field(T("Poll interval (ms)"), BoundNumberBox(
+                $"{basePath}.input.steamVr.pollIntervalMs",
+                1,
+                1000,
+                toolTip: T("Lower polling intervals respond faster but wake the CPU more often."))));
         }
         return stack;
+    }
+
+    private CheckBox BuildTriggerModeToggle(string path, Option option)
+    {
+        var enabledModes = GetNode(path)?.AsArray()
+            .Select(node => node?.GetValue<string>())
+            .OfType<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var label = new StackPanel { Orientation = Orientation.Horizontal };
+        if (option.Icon is not null)
+        {
+            label.Children.Add(MaterialIcon(
+                option.Icon,
+                16,
+                fill: MutedBrush,
+                margin: new Thickness(0, 0, 8, 0)));
+        }
+        label.Children.Add(new TextBlock
+        {
+            Text = option.Label,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+
+        var updating = false;
+        var toggle = new CheckBox
+        {
+            Content = label,
+            IsChecked = enabledModes.Contains(option.Value),
+            ToolTip = $"{option.ToolTip} {T("Enable or disable this trigger without changing its binding.")}"
+        };
+        void Apply(bool enabled)
+        {
+            if (_building || updating)
+            {
+                return;
+            }
+
+            var current = GetNode(path)?.AsArray()
+                .Select(node => node?.GetValue<string>())
+                .OfType<string>()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!enabled && current.Count <= 1 && current.Contains(option.Value))
+            {
+                updating = true;
+                toggle.IsChecked = true;
+                updating = false;
+                ShowToast(T("At least one trigger type must remain enabled."), true);
+                return;
+            }
+
+            if (enabled)
+            {
+                current.Add(option.Value);
+            }
+            else
+            {
+                current.Remove(option.Value);
+            }
+
+            Set(path, new JsonArray(
+                new[] { "keyboard", "mouse", "xinput", "steamvr" }
+                    .Where(current.Contains)
+                    .Select(mode => JsonValue.Create(mode))
+                    .ToArray()));
+            MarkDirty(rebuild: true);
+        }
+
+        toggle.Checked += (_, _) => Apply(true);
+        toggle.Unchecked += (_, _) => Apply(false);
+        return toggle;
     }
 
     private UIElement BuildProfileProcessing(JsonObject profile)
@@ -483,7 +599,7 @@ public partial class NativeMainWindow
             {
                 new Option("captured-window", T("Window")),
                 new Option("vrchat-osc", "VRChat OSC")
-            }, rebuild: true))));
+            }, rebuild: true, toolTip: T("Choose whether text is injected into the captured window or sent through VRChat OSC.")))));
 
         if (outputMode == "vrchat-osc")
         {
@@ -494,10 +610,21 @@ public partial class NativeMainWindow
                     Field(T("Host"), BoundTextBox($"{basePath}.output.vrChat.host")),
                     Field(T("Port"), BoundNumberBox($"{basePath}.output.vrChat.port", 1, 65535))),
                 TwoColumns(
-                    Field(T("Character limit"), BoundNumberBox($"{basePath}.output.vrChat.maxChatboxCharacters", 1, 144)),
-                    BoundCheckBox(T("Send immediately"), $"{basePath}.output.vrChat.sendImmediately"))));
+                    Field(T("Character limit"), BoundNumberBox(
+                        $"{basePath}.output.vrChat.maxChatboxCharacters",
+                        1,
+                        144,
+                        toolTip: T("Limit each VRChat Chatbox message to this many characters."))),
+                    BoundCheckBox(
+                        T("Send immediately"),
+                        $"{basePath}.output.vrChat.sendImmediately",
+                        toolTip: T("Submit Chatbox text immediately instead of leaving it in the input field.")))));
             return content;
         }
+
+        content.Children.Add(Notice(
+            T("Window output uses synthetic keyboard input for text entry and optional open or submit hotkeys. Anti-cheat software may detect input injection and could suspend or ban the account. Use this output mode only where permitted."),
+            true));
 
         var openMode = GetString($"{basePath}.output.windows.openInput.mode", "none");
         var submitMode = GetString($"{basePath}.output.windows.submission.mode", "none");
@@ -507,11 +634,15 @@ public partial class NativeMainWindow
             Field(T("Open input"), BoundCombo($"{basePath}.output.windows.openInput.mode", new[]
             {
                 new Option("none", T("None")), new Option("hotkey", T("Hotkey"))
-            }, rebuild: true)),
+            }, rebuild: true, toolTip: T("Optionally send a keyboard shortcut before inserting recognized text."))),
             openMode == "hotkey"
                 ? TwoColumns(
                     Field(T("Capture keys"), BuildOutputChord(profile, $"{basePath}.output.windows.openInput.virtualKeys")),
-                    Field(T("Open delay (ms)"), BoundNumberBox($"{basePath}.output.windows.openInputDelayMs", 0, 5000)))
+                    Field(T("Open delay (ms)"), BoundNumberBox(
+                        $"{basePath}.output.windows.openInputDelayMs",
+                        0,
+                        5000,
+                        toolTip: T("Wait this long after opening the input field before inserting text."))))
                 : new Border()));
         content.Children.Add(Section(
             T("Text input"),
@@ -521,15 +652,18 @@ public partial class NativeMainWindow
                 new Option("clipboard-paste", T("Clipboard paste")),
                 new Option("unicode-send-input", T("Unicode input")),
                 new Option("keyboard", T("Keyboard events"))
-            })),
-            BoundCheckBox(T("Require same foreground window"), $"{basePath}.output.windows.requireSameForeground")));
+            }, toolTip: T("Choose how recognized text is delivered to the captured window."))),
+            BoundCheckBox(
+                T("Require same foreground window"),
+                $"{basePath}.output.windows.requireSameForeground",
+                toolTip: T("Cancel output if focus moves to a different window after recording starts."))));
         content.Children.Add(Section(
             T("Submit"),
             string.Empty,
             Field(T("Submit"), BoundCombo($"{basePath}.output.windows.submission.mode", new[]
             {
                 new Option("none", T("None")), new Option("hotkey", T("Hotkey"))
-            }, rebuild: true)),
+            }, rebuild: true, toolTip: T("Optionally send a keyboard shortcut after inserting recognized text."))),
             submitMode == "hotkey"
                 ? Field(T("Capture keys"), BuildOutputChord(profile, $"{basePath}.output.windows.submission.virtualKeys"))
                 : new Border()));
@@ -544,19 +678,20 @@ public partial class NativeMainWindow
             var capture = await _controller.CaptureKeyboardChordAsync();
             Set(path, new JsonArray(capture.VirtualKeys.Select(value => JsonValue.Create(value)).ToArray()));
             MarkDirty(rebuild: true);
-        });
+        }, T("Press and release the keyboard shortcut to bind it."));
     }
 
-    private Grid BindingRow(string value, Func<Button, Task> capture)
+    private Grid BindingRow(string value, Func<Button, Task> capture, string? toolTip = null)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var text = new TextBox { Text = value, IsReadOnly = true };
+        var text = new TextBox { Text = value, IsReadOnly = true, ToolTip = toolTip };
         var button = new Button
         {
             Content = T("Capture binding"),
-            Style = (Style)FindResource("ActionButtonStyle")
+            Style = (Style)FindResource("ActionButtonStyle"),
+            ToolTip = toolTip
         };
         button.Click += async (_, _) =>
         {
@@ -583,7 +718,11 @@ public partial class NativeMainWindow
         };
         profile["input"] ??= new JsonObject();
         var input = profile["input"]!.AsObject();
-        input["mode"] ??= "keyboard";
+        if (input["modes"] is not JsonArray { Count: > 0 })
+        {
+            input["modes"] = new JsonArray(input["mode"]?.GetValue<string>() ?? "keyboard");
+        }
+        input.Remove("mode");
         input["keyboard"] ??= new JsonObject { ["virtualKeys"] = new JsonArray(119), ["suppressKey"] = false };
         input["mouse"] ??= new JsonObject { ["button"] = "x1", ["suppressButton"] = false };
         input["gamepad"] ??= new JsonObject { ["userIndex"] = 0, ["buttonMask"] = 4096, ["pollIntervalMs"] = 8 };

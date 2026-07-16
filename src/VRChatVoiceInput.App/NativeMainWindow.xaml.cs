@@ -817,9 +817,9 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return path;
     }
 
-    private CheckBox BoundCheckBox(string text, string path, bool rebuild = false)
+    private CheckBox BoundCheckBox(string text, string path, bool rebuild = false, string? toolTip = null)
     {
-        var checkBox = new CheckBox { Content = text, IsChecked = GetBool(path) };
+        var checkBox = new CheckBox { Content = text, IsChecked = GetBool(path), ToolTip = toolTip };
         checkBox.Checked += (_, _) => { Set(path, true); MarkDirty(rebuild); };
         checkBox.Unchecked += (_, _) => { Set(path, false); MarkDirty(rebuild); };
         return checkBox;
@@ -844,10 +844,19 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return textBox;
     }
 
-    private TextBox BoundNumberBox(string path, int minimum, int maximum, bool nullable = false)
+    private TextBox BoundNumberBox(
+        string path,
+        int minimum,
+        int maximum,
+        bool nullable = false,
+        string? toolTip = null)
     {
         var node = GetNode(path);
-        var textBox = new TextBox { Text = node is null ? string.Empty : GetInt(path).ToString(CultureInfo.InvariantCulture) };
+        var textBox = new TextBox
+        {
+            Text = node is null ? string.Empty : GetInt(path).ToString(CultureInfo.InvariantCulture),
+            ToolTip = toolTip
+        };
         textBox.LostKeyboardFocus += (_, _) =>
         {
             if (nullable && string.IsNullOrWhiteSpace(textBox.Text))
@@ -869,14 +878,20 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return textBox;
     }
 
-    private ComboBox BoundCombo(string path, IEnumerable<Option> options, bool rebuild = false, string? fallback = null)
+    private ComboBox BoundCombo(
+        string path,
+        IEnumerable<Option> options,
+        bool rebuild = false,
+        string? fallback = null,
+        string? toolTip = null)
     {
         var combo = new ComboBox
         {
             ItemsSource = options.ToArray(),
             DisplayMemberPath = nameof(Option.Label),
             SelectedValuePath = nameof(Option.Value),
-            SelectedValue = GetString(path, fallback ?? string.Empty)
+            SelectedValue = GetString(path, fallback ?? string.Empty),
+            ToolTip = toolTip
         };
         combo.SelectionChanged += (_, _) =>
         {
@@ -910,7 +925,8 @@ public partial class NativeMainWindow : Window, ISettingsWindow
                 Style = (Style)FindResource("SegmentButtonStyle"),
                 MinWidth = 88,
                 Tag = string.Equals(option.Value, current, StringComparison.OrdinalIgnoreCase) ? "active" : null,
-                BorderThickness = index == values.Length - 1 ? new Thickness(0) : new Thickness(0, 0, 1, 0)
+                BorderThickness = index == values.Length - 1 ? new Thickness(0) : new Thickness(0, 0, 1, 0),
+                ToolTip = option.ToolTip
             };
             if (option.Icon is null)
             {
@@ -1027,7 +1043,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return $"{amount:0.#} {units[unit]}";
     }
 
-    private sealed record Option(string Value, string Label, Geometry? Icon = null)
+    private sealed record Option(string Value, string Label, Geometry? Icon = null, string? ToolTip = null)
     {
         public override string ToString() => Label;
     }

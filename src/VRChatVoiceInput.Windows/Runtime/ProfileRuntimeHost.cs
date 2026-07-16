@@ -167,15 +167,12 @@ public sealed class ProfileRuntimeHost : IAsyncDisposable
     {
         bool IsActive() => IsProfileActive(profile);
 
-        IPushToTalkInput input = profile.Input.Mode.ToLowerInvariant() switch
-        {
-            "keyboard" => new GlobalKeyboardPttInput(profile.Input.Keyboard, IsActive),
-            "mouse" => new GlobalMousePttInput(profile.Input.Mouse, IsActive),
-            "xinput" => new XInputGamepadPttInput(profile.Input.Gamepad, IsActive),
-            "steamvr" => new SteamVrPttInput(profile.Input.SteamVr, IsActive),
-            _ => throw new InvalidOperationException(
-                $"Unsupported input mode '{profile.Input.Mode}' in profile '{profile.Id}'.")
-        };
+        var inputs = profile.Input.GetEffectiveModes()
+            .Select(mode => CreateInput(mode, profile.Input, IsActive, profile.Id))
+            .ToArray();
+        IPushToTalkInput input = inputs.Length == 1
+            ? inputs[0]
+            : new CompositePushToTalkInput(inputs);
         var providerId = _providerOverride ?? profile.Recognition.Provider;
         if (!_providers.TryGetValue(providerId, out var provider))
         {
@@ -325,14 +322,32 @@ public sealed class ProfileRuntimeHost : IAsyncDisposable
             _ => throw new InvalidOperationException($"Unsupported output mode '{configuration.Mode}'.")
         };
 
+    private static IPushToTalkInput CreateInput(
+        string mode,
+        InputConfiguration configuration,
+        Func<bool> isActive,
+        string profileId) =>
+        mode.ToLowerInvariant() switch
+        {
+            "keyboard" => new GlobalKeyboardPttInput(configuration.Keyboard, isActive),
+            "mouse" => new GlobalMousePttInput(configuration.Mouse, isActive),
+            "xinput" => new XInputGamepadPttInput(configuration.Gamepad, isActive),
+            "steamvr" => new SteamVrPttInput(configuration.SteamVr, isActive),
+            _ => throw new InvalidOperationException(
+                $"Unsupported input mode '{mode}' in profile '{profileId}'.")
+        };
+
     private static string DescribeInput(InputConfiguration configuration) =>
-        configuration.Mode.ToLowerInvariant() switch
+        string.Join(" + ", configuration.GetEffectiveModes().Select(mode => DescribeInput(mode, configuration)));
+
+    private static string DescribeInput(string mode, InputConfiguration configuration) =>
+        mode.ToLowerInvariant() switch
         {
             "keyboard" => $"keyboard [{string.Join("+", GetKeyboardKeys(configuration.Keyboard).Select(key => $"0x{key:X2}"))}]",
             "mouse" => $"mouse {MousePttButtons.Normalize(configuration.Mouse.Button)}",
             "xinput" => $"XInput mask 0x{configuration.Gamepad.ButtonMask:X4} on controller {configuration.Gamepad.UserIndex}",
             "steamvr" => $"SteamVR action {configuration.SteamVr.ActionPath}",
-            _ => configuration.Mode
+            _ => mode
         };
 
     private static IReadOnlyList<int> GetKeyboardKeys(KeyboardInputConfiguration configuration) =>

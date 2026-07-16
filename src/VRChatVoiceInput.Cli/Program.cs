@@ -401,6 +401,35 @@ internal sealed class CommandLineApplication
             throw new InvalidOperationException("Invalid open-input delay was accepted.");
         }
 
+        var multiModeInput = new InputConfiguration
+        {
+            Mode = "mouse",
+            Modes = ["keyboard", "steamvr"]
+        };
+        if (!multiModeInput.GetEffectiveModes().SequenceEqual(["keyboard", "steamvr"]) ||
+            !new InputConfiguration { Mode = "mouse" }.GetEffectiveModes().SequenceEqual(["mouse"]))
+        {
+            throw new InvalidOperationException("Multi-mode input compatibility check failed.");
+        }
+
+        var firstInput = new TestPushToTalkInput();
+        var secondInput = new TestPushToTalkInput();
+        using (var compositeInput = new CompositePushToTalkInput([firstInput, secondInput]))
+        {
+            var states = new List<bool>();
+            compositeInput.StateChanged += (_, eventArgs) => states.Add(eventArgs.IsPressed);
+            compositeInput.StartAsync().GetAwaiter().GetResult();
+            firstInput.SetPressed(true);
+            secondInput.SetPressed(true);
+            firstInput.SetPressed(false);
+            secondInput.SetPressed(false);
+            compositeInput.StopAsync().GetAwaiter().GetResult();
+            if (!states.SequenceEqual([true, false]))
+            {
+                throw new InvalidOperationException("Composite PTT state aggregation check failed.");
+            }
+        }
+
         using (var mouseInput = new GlobalMousePttInput(new MouseInputConfiguration()))
         {
             mouseInput.StartAsync().GetAwaiter().GetResult();
@@ -476,6 +505,7 @@ internal sealed class CommandLineApplication
             {
                 Id = "vrchat",
                 Match = new ApplicationMatchConfiguration { ProcessNames = ["VRChat.exe"] },
+                Input = new InputConfiguration { Modes = ["keyboard", "steamvr"] },
                 Recognition = new ProfileRecognitionConfiguration { Provider = "paraformer-gguf" }
             },
             new()
@@ -497,6 +527,18 @@ internal sealed class CommandLineApplication
         {
             throw new InvalidOperationException("Empty process match must select the current-foreground profile.");
         }
+    }
+
+    private sealed class TestPushToTalkInput : IPushToTalkInput
+    {
+        public event EventHandler<PushToTalkChangedEventArgs>? StateChanged;
+
+        public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public void SetPressed(bool isPressed) =>
+            StateChanged?.Invoke(this, new PushToTalkChangedEventArgs(isPressed, DateTimeOffset.Now));
     }
 
     private static void PrintUsage()
