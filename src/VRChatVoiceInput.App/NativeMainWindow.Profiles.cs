@@ -385,7 +385,7 @@ public partial class NativeMainWindow
         else
         {
             var status = _controller.GetSteamVrStatus();
-            stack.Children.Add(Notice(status.Message, !status.Connected));
+            stack.Children.Add(Notice(LocalizeSteamVrStatus(status.Message), !status.Connected));
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 9, 0, 0) };
             var refresh = ActionButton(
                 T("Refresh SteamVR"),
@@ -412,6 +412,11 @@ public partial class NativeMainWindow
         var parsedConfiguration = AppConfiguration.Parse(_configuration.ToJsonString());
         var availability = AsrProviderFactory.CheckAvailability(parsedConfiguration.Asr)
             .First(status => status.Id == provider);
+        var streamingEnabled = profile["recognition"]?["streamingEnabled"]?.GetValue<bool>() == true;
+        var missingRequirements = availability.MissingFiles
+            .Concat(streamingEnabled ? availability.StreamingMissingFiles : [])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         var providerOptions = AsrProviderFactory.ProviderIds.Select(id =>
             new Option(id, id + (AsrProviderFactory.CheckAvailability(parsedConfiguration.Asr).First(status => status.Id == id).Available ? "" : $" ({T("Not installed")})")));
         var content = new StackPanel();
@@ -425,9 +430,9 @@ public partial class NativeMainWindow
                     new Option("auto", T("Auto detect")), new Option("zh", T("Chinese")),
                     new Option("en", T("English")), new Option("ja", T("Japanese")), new Option("ko", "한국어")
                 }))),
-            availability.Available
+            missingRequirements.Length == 0
                 ? new Border()
-                : Notice($"Missing files: {string.Join(", ", availability.MissingFiles)}", true),
+                : Notice($"{T("Missing files")}: {string.Join("; ", missingRequirements.Select(FormatRequirement))}", true),
             BoundCheckBox(T("Streaming recognition"), $"{basePath}.recognition.streamingEnabled"),
             BuildHotwordField(profile, basePath, availability.SupportsTerminologyHints)));
         return content;
@@ -459,7 +464,9 @@ public partial class NativeMainWindow
         field.Children.Add(Field(T("Hotwords"), box));
         if (!supported)
         {
-            field.Children.Add(Notice($"Hotwords are unavailable for {GetString($"{basePath}.recognition.provider") }.", true));
+            field.Children.Add(Notice(TF(
+                "Hotwords are unavailable for {0}.",
+                GetString($"{basePath}.recognition.provider")), true));
         }
         return field;
     }

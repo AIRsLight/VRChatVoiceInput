@@ -12,6 +12,7 @@ internal sealed class TrayIconService : IDisposable
     private readonly Forms.ToolStripMenuItem _openSettingsItem;
     private readonly Forms.ToolStripMenuItem _runtimeItem;
     private readonly Forms.ToolStripMenuItem _exitItem;
+    private readonly Action _showSettings;
     private readonly Func<Task> _exitAsync;
     private string _languageSetting;
 
@@ -21,6 +22,7 @@ internal sealed class TrayIconService : IDisposable
         Func<Task> exitAsync)
     {
         _controller = controller;
+        _showSettings = showSettings;
         _exitAsync = exitAsync;
         _languageSetting = _controller.LoadConfiguration().Application.UiLanguage;
         _statusItem = new Forms.ToolStripMenuItem { Enabled = false };
@@ -81,13 +83,38 @@ internal sealed class TrayIconService : IDisposable
         }
         catch (Exception exception)
         {
-            _controller.AddHostLog("error", exception.Message, exception: exception);
+            if (exception is RuntimeNotReadyException notReady)
+            {
+                _controller.AddHostLog("warning", exception.Message, exception: exception);
+                ShowRuntimeStartFailure(notReady);
+            }
+            else
+            {
+                _controller.AddHostLog("error", exception.Message, exception: exception);
+            }
         }
         finally
         {
             _runtimeItem.Enabled = true;
             UpdateState(_controller.IsRunning);
         }
+    }
+
+    internal void ShowRuntimeStartFailure(RuntimeNotReadyException exception)
+    {
+        _showSettings();
+        var issue = exception.Readiness.Issues[0];
+        var message = NativeLocalization.Resolve(_languageSetting) switch
+        {
+            "zh" => $"预设“{issue.ProfileId}”缺少 {issue.MissingRequirements.Count} 个必需组件。请在模型页面完成安装。",
+            "ja" => $"プリセット「{issue.ProfileId}」には {issue.MissingRequirements.Count} 件の必須コンポーネントが不足しています。モデル画面でインストールしてください。",
+            _ => $"Profile '{issue.ProfileId}' is missing {issue.MissingRequirements.Count} required components. Install them on the Models page."
+        };
+        _notifyIcon.ShowBalloonTip(
+            8000,
+            NativeLocalization.Translate(_languageSetting, "Service cannot start"),
+            message,
+            Forms.ToolTipIcon.Warning);
     }
 
     private void OnStateChanged(object? sender, VRChatVoiceInput.Windows.Runtime.RuntimeStateChangedEventArgs state) =>

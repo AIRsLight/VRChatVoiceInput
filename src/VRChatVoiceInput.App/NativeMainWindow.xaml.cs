@@ -129,10 +129,40 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         DiagnosticsNavText.Text = T("Diagnostics");
         RepositoryButtonText.Text = T("Project repository");
         RepositoryButton.ToolTip = T("Project repository");
+        RuntimeReadinessTitle.Text = T("Service cannot start");
+        OpenRequiredModelsText.Text = T("Open models");
+        OpenRequiredModelsButton.ToolTip = T("Open models");
         VersionText.Text = $"App {ApplicationVersion.Current}";
     }
 
     private string T(string key) => NativeWpfLocalization.Translate(GetString("application.uiLanguage", "auto"), key);
+
+    private string TF(string key, params object[] arguments) =>
+        string.Format(CultureInfo.CurrentCulture, T(key), arguments);
+
+    private string LocalizeSteamVrStatus(string message)
+    {
+        var direct = T(message);
+        if (!string.Equals(direct, message, StringComparison.Ordinal))
+        {
+            return direct;
+        }
+
+        foreach (var prefix in new[]
+                 {
+                     "SteamVR connection failed",
+                     "SteamVR application manifest registration failed",
+                     "SteamVR application identification failed"
+                 })
+        {
+            if (message.StartsWith(prefix + ":", StringComparison.Ordinal))
+            {
+                return T(prefix) + message[prefix.Length..];
+            }
+        }
+
+        return message;
+    }
 
     private void OnOpenProjectRepository(object sender, RoutedEventArgs eventArgs)
     {
@@ -201,15 +231,115 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         PageContext.Text = context;
 
         var running = _controller.IsRunning;
-        RuntimeDot.Fill = running ? SuccessBrush : new SolidColorBrush(Color.FromRgb(0x9D, 0xA5, 0x9F));
+        var readiness = _controller.GetRuntimeReadiness();
+        var blocked = !running && !readiness.Ready;
+        RuntimeDot.Fill = running
+            ? SuccessBrush
+            : blocked
+                ? WarningBrush
+                : new SolidColorBrush(Color.FromRgb(0x9D, 0xA5, 0x9F));
         var profile = _controller.ProfileOverride ?? T("Automatic");
-        RuntimeStatusText.Text = $"{T(running ? "Running" : "Stopped")} · {profile}";
+        RuntimeStatusText.Text = blocked
+            ? $"{T("Missing required files")} · {profile}"
+            : $"{T(running ? "Running" : "Stopped")} · {profile}";
         RuntimeToggleIcon.Data = running ? MaterialIconPaths.Stop : MaterialIconPaths.Play;
         RuntimeToggleButton.ToolTip = NativeLocalization.Translate(
             GetString("application.uiLanguage", "auto"),
-            running ? "Stop service" : "Start service");
+            running ? "Stop service" : blocked ? "Service cannot start" : "Start service");
         SaveStatusText.Text = T(_saving ? "Saving..." : _dirty ? "Waiting to save" : "Saved");
         SaveStatusText.Foreground = _saving ? MutedBrush : _dirty ? WarningBrush : SuccessBrush;
+        UpdateRuntimeReadiness(readiness, running);
+    }
+
+    private void UpdateRuntimeReadiness(RuntimeReadiness readiness, bool running)
+    {
+        RuntimeReadinessPanel.Visibility = !running && !readiness.Ready
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        if (readiness.Ready)
+        {
+            OpenRequiredModelsButton.Tag = null;
+            return;
+        }
+
+        RuntimeReadinessText.Text = FormatRuntimeReadinessSummary(readiness);
+        OpenRequiredModelsButton.Tag = readiness.Issues[0].ProviderId;
+    }
+
+    private string FormatRuntimeReadinessSummary(RuntimeReadiness readiness)
+    {
+        var issue = readiness.Issues[0];
+        var provider = ProviderLabels.TryGetValue(issue.ProviderId, out var label) ? label : issue.ProviderId;
+        var shown = string.Join("; ", issue.MissingRequirements.Take(2).Select(FormatRequirement));
+        var hiddenCount = issue.MissingRequirements.Count - 2;
+        var additionalProfiles = readiness.Issues.Count - 1;
+        return NativeLocalization.Resolve(GetString("application.uiLanguage", "auto")) switch
+        {
+            "zh" => $"预设“{issue.ProfileId}”使用 {provider}，缺少：{shown}" +
+                    (hiddenCount > 0 ? $"（另有 {hiddenCount} 项）" : string.Empty) +
+                    (additionalProfiles > 0 ? $"；另有 {additionalProfiles} 个预设未就绪。" : string.Empty),
+            "ja" => $"プリセット「{issue.ProfileId}」の {provider} に不足があります: {shown}" +
+                    (hiddenCount > 0 ? $"（ほか {hiddenCount} 件）" : string.Empty) +
+                    (additionalProfiles > 0 ? $"。ほか {additionalProfiles} 件のプリセットも未準備です。" : string.Empty),
+            _ => $"Profile '{issue.ProfileId}' uses {provider} and is missing: {shown}" +
+                 (hiddenCount > 0 ? $" ({hiddenCount} more)" : string.Empty) +
+                 (additionalProfiles > 0 ? $"; {additionalProfiles} more profiles are not ready." : string.Empty)
+        };
+    }
+
+    private string FormatRequirement(string requirement)
+    {
+        var separator = requirement.IndexOf(": ", StringComparison.Ordinal);
+        if (separator < 0)
+        {
+            return requirement;
+        }
+
+        var label = T(requirement[..separator]);
+        var value = requirement[(separator + 2)..];
+        if (string.Equals(value, "not configured", StringComparison.OrdinalIgnoreCase))
+        {
+            value = T("Not configured");
+        }
+        return $"{label}: {value}";
+    }
+
+    private string FormatRuntimeReadinessDetails(RuntimeReadiness readiness)
+    {
+        var lines = new List<string>
+        {
+            T("Install the required model and runtime components before starting the service."),
+            string.Empty
+        };
+        foreach (var issue in readiness.Issues)
+        {
+            var provider = ProviderLabels.TryGetValue(issue.ProviderId, out var label) ? label : issue.ProviderId;
+            lines.Add($"{T("Profile")}: {issue.ProfileId} · {provider}");
+            lines.AddRange(issue.MissingRequirements.Select(requirement => $"- {FormatRequirement(requirement)}"));
+            lines.Add(string.Empty);
+        }
+        return string.Join(Environment.NewLine, lines).TrimEnd();
+    }
+
+    private void ShowRuntimeReadinessDialog(RuntimeReadiness readiness)
+    {
+        UpdateRuntimeReadiness(readiness, running: false);
+        System.Windows.MessageBox.Show(
+            this,
+            FormatRuntimeReadinessDetails(readiness),
+            T("Service cannot start"),
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
+    private void OnOpenRequiredModels(object sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is Button { Tag: string providerId } && ProviderLabels.ContainsKey(providerId))
+        {
+            _selectedProvider = providerId;
+        }
+        _view = "models";
+        BuildCurrentPage();
     }
 
     private string FormatLogCount(int count) => NativeLocalization.Resolve(GetString("application.uiLanguage", "auto")) switch
@@ -225,6 +355,10 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         try
         {
             await SaveNowAsync();
+            if (_dirty)
+            {
+                return;
+            }
             if (_controller.IsRunning)
             {
                 await _controller.StopAsync();
@@ -335,8 +469,9 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         {
             _downloadProgress = progress;
             var active = progress.State is "checking" or "downloading" or "verifying" or "extracting";
+            var localizedMessage = LocalizeModelDownloadMessage(progress);
             DownloadPanel.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
-            DownloadText.Text = $"{progress.Message} {FormatBytes(progress.BytesDownloaded)} / {FormatBytes(progress.TotalBytes)}";
+            DownloadText.Text = $"{localizedMessage} {FormatBytes(progress.BytesDownloaded)} / {FormatBytes(progress.TotalBytes)}";
             DownloadProgress.Value = progress.TotalBytes <= 0
                 ? 0
                 : Math.Clamp(progress.BytesDownloaded * 100d / progress.TotalBytes, 0, 100);
@@ -346,9 +481,28 @@ public partial class NativeMainWindow : Window, ISettingsWindow
             }
             if (progress.State == "error")
             {
-                ShowToast(progress.Message, true);
+                ShowToast(localizedMessage, true);
             }
         });
+    }
+
+    private string LocalizeModelDownloadMessage(ModelDownloadProgress progress)
+    {
+        var fileName = progress.FileName ?? string.Empty;
+        return progress.State switch
+        {
+            "checking" when string.IsNullOrWhiteSpace(progress.FileName) => T("Checking installed model files."),
+            "checking" => TF("Verified {0}.", fileName),
+            "downloading" when progress.Message.StartsWith("Download interrupted.", StringComparison.Ordinal) =>
+                TF("Download interrupted. Retrying {0}.", fileName),
+            "downloading" => TF("Downloading {0}.", fileName),
+            "verifying" => TF("Verifying {0}.", fileName),
+            "extracting" => TF("Extracting {0}.", fileName),
+            "completed" => T("Model files are installed and verified."),
+            "canceled" => T("Download canceled. Partial files will be resumed next time."),
+            "error" => TF("Download failed: {0}", progress.Message),
+            _ => progress.Message
+        };
     }
 
     private void OnMicrophoneLevelsChanged(object? sender, MicrophoneLevelsChangedEventArgs eventArgs)
@@ -412,6 +566,14 @@ public partial class NativeMainWindow : Window, ISettingsWindow
 
     private void ShowError(Exception exception)
     {
+        if (exception is RuntimeNotReadyException notReady)
+        {
+            AppFileLogger.Warning("native-wpf", "Runtime start was refused because required files are missing.", exception);
+            ShowRuntimeReadinessDialog(notReady.Readiness);
+            UpdateTopbar();
+            return;
+        }
+
         AppFileLogger.Error("native-wpf", "Native WPF interface operation failed.", exception);
         ShowToast($"{T("Operation failed")}: {exception.Message}", true);
     }

@@ -540,6 +540,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="64" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <Border Grid.Row="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,0">
@@ -583,7 +584,37 @@
                 </Grid>
             </Border>
 
-            <ContentControl x:Name="PageContent" Grid.Row="2" />
+            <Border x:Name="RuntimeReadinessPanel" Grid.Row="2" Background="#FFF4DC" BorderBrush="#E5C68E"
+                    BorderThickness="0,0,0,1" Padding="24,10" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="22" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Path Data="{x:Static local:MaterialIconPaths.InformationOutline}" Width="16" Height="16"
+                          Stretch="Uniform" Fill="#9A5A00" VerticalAlignment="Top" Margin="0,1,0,0" />
+                    <StackPanel Grid.Column="1" Margin="7,0,16,0">
+                        <TextBlock x:Name="RuntimeReadinessTitle" FontSize="12" FontWeight="SemiBold" Foreground="#754600" />
+                        <TextBlock x:Name="RuntimeReadinessText" FontSize="10" Foreground="#754600"
+                                   TextWrapping="Wrap" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <Button x:Name="OpenRequiredModelsButton" Grid.Column="2" MinWidth="108" Height="32"
+                            Style="{StaticResource ActionButtonStyle}" Click="OnOpenRequiredModels">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{x:Static local:MaterialIconPaths.Memory}" Width="15" Height="15"
+                                  Stretch="Uniform"
+                                  Fill="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                  VerticalAlignment="Center" />
+                            <TextBlock x:Name="OpenRequiredModelsText" Text="Open models" Margin="7,0,0,0"
+                                       Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <ContentControl x:Name="PageContent" Grid.Row="3" />
         </Grid>
 
         <Border x:Name="Toast" Grid.ColumnSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom"

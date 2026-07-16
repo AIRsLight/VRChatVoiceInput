@@ -110,17 +110,17 @@ public static class AsrProviderFactory
         var missingFiles = files
             .Where(file => !file.Optional || !string.IsNullOrWhiteSpace(file.Path))
             .Where(file => string.IsNullOrWhiteSpace(file.Path) || !File.Exists(file.Path))
-            .Select(file => string.IsNullOrWhiteSpace(file.Path)
-                ? $"{file.Label}: not configured"
-                : file.Path!)
+            .Select(file => $"{file.Label}: " + (string.IsNullOrWhiteSpace(file.Path)
+                ? "not configured"
+                : file.Path!))
             .ToArray();
         var streamingMissingFiles = string.IsNullOrWhiteSpace(streaming.SileroVadModelPath) ||
             !File.Exists(streaming.SileroVadModelPath)
                 ? new[]
                 {
-                    string.IsNullOrWhiteSpace(streaming.SileroVadModelPath)
-                        ? "Silero VAD model: not configured"
-                        : streaming.SileroVadModelPath
+                    "Silero VAD model: " + (string.IsNullOrWhiteSpace(streaming.SileroVadModelPath)
+                        ? "not configured"
+                        : streaming.SileroVadModelPath)
                 }
                 : Array.Empty<string>();
         return new AsrProviderAvailability(

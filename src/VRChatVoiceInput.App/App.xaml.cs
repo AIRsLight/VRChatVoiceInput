@@ -67,6 +67,10 @@ public partial class App : System.Windows.Application
                     AppFileLogger.Warning(
                         "startup",
                         $"Automatic runtime startup failed: {exception.Message}");
+                    if (exception is RuntimeNotReadyException notReady)
+                    {
+                        _trayIcon.ShowRuntimeStartFailure(notReady);
+                    }
                 }
             }
         }

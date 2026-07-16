@@ -168,7 +168,7 @@ Streaming recognition and streaming output are separate behaviors:
 - Missing `silero_vad.onnx` does not disable ordinary final recognition, but a streaming-enabled profile cannot be activated until the VAD model is installed.
 - All five local providers stay loaded across segments. Fun-ASR-Nano uses a resident stdin/stdout worker, while whisper.cpp uses its official loopback HTTP server.
 
-The desktop UI checks the configured executable, model, language-model, and optional VAD paths. Providers with missing required files are marked `Not installed` and cannot be selected by a profile. The Models page remains accessible so those paths can be repaired.
+The desktop UI checks the configured executable, model, language-model, and enabled VAD paths. Providers with missing required files are marked `Not installed`, but incomplete model and runtime selections can still be saved so source-only packages support staged downloads without reporting a configuration error after every component. Service startup is the enforcement boundary: the current runtime profile is checked before any provider is created, startup is refused when required files are missing, and the WPF interface shows a persistent warning with a direct link to the Models page. Clicking Start also shows the complete localized missing-component list. Streaming-enabled profiles include the Silero VAD model in this readiness check.
 
 Paraformer can optionally restore Chinese and English punctuation after recognition:
 

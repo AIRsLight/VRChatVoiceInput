@@ -74,7 +74,7 @@ public sealed class RuntimeController : IAsyncDisposable
             try
             {
                 var configuration = LoadConfiguration();
-                EnsureSelectedProvidersAvailable(configuration, _profileOverride);
+                EnsureRuntimeReady(configuration, _profileOverride);
                 host = new ProfileRuntimeHost(configuration, _profileOverride);
                 host.LogReceived += OnHostLogReceived;
                 host.StateChanged += OnHostStateChanged;
@@ -102,7 +102,12 @@ public sealed class RuntimeController : IAsyncDisposable
 
                 if (exception is not OperationCanceledException)
                 {
-                    AddHostLog("error", $"Runtime start failed: {exception.Message}", exception: exception);
+                    AddHostLog(
+                        exception is RuntimeNotReadyException ? "warning" : "error",
+                        exception is RuntimeNotReadyException
+                            ? $"Runtime start refused: {exception.Message}"
+                            : $"Runtime start failed: {exception.Message}",
+                        exception: exception);
                 }
                 throw;
             }
@@ -161,7 +166,10 @@ public sealed class RuntimeController : IAsyncDisposable
                 throw new InvalidOperationException($"Profile '{normalizedProfileId}' is disabled.");
             }
 
-            EnsureSelectedProvidersAvailable(configuration, normalizedProfileId);
+            if (IsRunning)
+            {
+                EnsureRuntimeReady(configuration, normalizedProfileId);
+            }
         }
 
         var wasRunning = IsRunning;
@@ -207,7 +215,6 @@ public sealed class RuntimeController : IAsyncDisposable
                 ? profiles[previousEntry.index].Id
                 : null;
         }
-        EnsureSelectedProvidersAvailable(configuration, _profileOverride);
         var restartRuntime = IsRunning && !string.Equals(
             CreateRuntimeConfigurationFingerprint(previousConfiguration, previousProfileOverride),
             CreateRuntimeConfigurationFingerprint(configuration, _profileOverride),
@@ -423,6 +430,9 @@ public sealed class RuntimeController : IAsyncDisposable
     }
 
     internal bool CancelModelDownload() => _modelDownloads.Cancel();
+
+    internal RuntimeReadiness GetRuntimeReadiness() =>
+        CreateRuntimeReadiness(LoadConfiguration(), _profileOverride);
 
     public async Task SendOutputTestAsync(
         string profileId,
@@ -776,7 +786,18 @@ public sealed class RuntimeController : IAsyncDisposable
         File.Move(temporaryPath, path, overwrite: true);
     }
 
-    private static void EnsureSelectedProvidersAvailable(AppConfiguration configuration, string? profileOverride)
+    private static void EnsureRuntimeReady(AppConfiguration configuration, string? profileOverride)
+    {
+        var readiness = CreateRuntimeReadiness(configuration, profileOverride);
+        if (!readiness.Ready)
+        {
+            throw new RuntimeNotReadyException(readiness);
+        }
+    }
+
+    private static RuntimeReadiness CreateRuntimeReadiness(
+        AppConfiguration configuration,
+        string? profileOverride)
     {
         var profiles = configuration.GetEffectiveProfiles();
         var selectedProfiles = profileOverride is null
@@ -785,22 +806,34 @@ public sealed class RuntimeController : IAsyncDisposable
                 profile.Enabled && string.Equals(profile.Id, profileOverride, StringComparison.OrdinalIgnoreCase));
         var statuses = AsrProviderFactory.CheckAvailability(configuration.Asr)
             .ToDictionary(status => status.Id, StringComparer.OrdinalIgnoreCase);
-
+        var issues = new List<RuntimeReadinessIssue>();
         foreach (var profile in selectedProfiles)
         {
             if (!statuses.TryGetValue(profile.Recognition.Provider, out var status))
             {
-                throw new InvalidOperationException(
-                    $"Profile '{profile.Id}' selects unknown provider '{profile.Recognition.Provider}'.");
+                issues.Add(new RuntimeReadinessIssue(
+                    profile.Id,
+                    profile.Recognition.Provider,
+                    [$"Unknown provider: {profile.Recognition.Provider}"]));
+                continue;
             }
 
-            if (!status.Available)
+            var missingRequirements = status.MissingFiles.AsEnumerable();
+            if (profile.Recognition.StreamingEnabled)
             {
-                throw new InvalidOperationException(
-                    $"Profile '{profile.Id}' cannot use '{status.Id}' because required files are missing: " +
-                    string.Join(", ", status.MissingFiles));
+                missingRequirements = missingRequirements.Concat(status.StreamingMissingFiles);
+            }
+
+            var missing = missingRequirements
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (missing.Length > 0)
+            {
+                issues.Add(new RuntimeReadinessIssue(profile.Id, status.Id, missing));
             }
         }
+
+        return new RuntimeReadiness(issues);
     }
 
     private static string CreateRuntimeConfigurationFingerprint(
@@ -879,3 +912,30 @@ public sealed class RuntimeController : IAsyncDisposable
 internal sealed record RuntimeDiagnosticSnapshot(
     long WorkingSetBytes,
     IReadOnlyList<RuntimeLogEventArgs> Logs);
+
+internal sealed record RuntimeReadiness(IReadOnlyList<RuntimeReadinessIssue> Issues)
+{
+    public bool Ready => Issues.Count == 0;
+}
+
+internal sealed record RuntimeReadinessIssue(
+    string ProfileId,
+    string ProviderId,
+    IReadOnlyList<string> MissingRequirements);
+
+internal sealed class RuntimeNotReadyException : InvalidOperationException
+{
+    public RuntimeNotReadyException(RuntimeReadiness readiness)
+        : base(BuildMessage(readiness))
+    {
+        Readiness = readiness;
+    }
+
+    public RuntimeReadiness Readiness { get; }
+
+    private static string BuildMessage(RuntimeReadiness readiness) =>
+        "Required files are missing. " + string.Join(
+            "; ",
+            readiness.Issues.Select(issue =>
+                $"Profile '{issue.ProfileId}' ({issue.ProviderId}): {string.Join(", ", issue.MissingRequirements)}"));
+}
