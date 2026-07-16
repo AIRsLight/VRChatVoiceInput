@@ -14,39 +14,109 @@ public partial class NativeMainWindow
     private UIElement BuildProfilesPage()
     {
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(210) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
 
-        var sidebar = new DockPanel { Margin = new Thickness(16, 18, 16, 18) };
-        var add = ActionButton(T("Add profile"), OnAddProfile);
-        add.Margin = new Thickness(0, 0, 0, 10);
-        DockPanel.SetDock(add, Dock.Top);
-        sidebar.Children.Add(add);
-        var list = new ListBox { BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+        var sidebar = new DockPanel { Margin = new Thickness(12, 18, 12, 18) };
+        var sidebarHeader = new DockPanel { LastChildFill = true, Margin = new Thickness(5, 0, 5, 12) };
+        var sidebarActions = new StackPanel { Orientation = Orientation.Horizontal };
+        var automatic = IconButton("\uE72C", T("Resume automatic application routing"), async (_, _) =>
+        {
+            await SaveNowAsync();
+            if (_dirty) return;
+            try
+            {
+                await _controller.SetProfileOverrideAsync(null);
+                UpdateTopbar();
+                BuildCurrentPage();
+            }
+            catch (Exception exception)
+            {
+                ShowError(exception);
+            }
+        });
+        automatic.IsEnabled = !string.IsNullOrWhiteSpace(_controller.ProfileOverride);
+        automatic.Margin = new Thickness(0, 0, 6, 0);
+        sidebarActions.Children.Add(automatic);
+        sidebarActions.Children.Add(IconButton("\uE710", T("Add profile"), OnAddProfile));
+        DockPanel.SetDock(sidebarActions, Dock.Right);
+        sidebarHeader.Children.Add(sidebarActions);
+        sidebarHeader.Children.Add(new TextBlock
+        {
+            Text = T("Profiles"),
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        DockPanel.SetDock(sidebarHeader, Dock.Top);
+        sidebar.Children.Add(sidebarHeader);
+
+        var list = new StackPanel();
         for (var index = 0; index < Profiles.Count; index++)
         {
             var profileNode = Profiles[index]?.AsObject();
             var id = profileNode?["id"]?.GetValue<string>() ?? $"Profile {index + 1}";
-            var item = new ListBoxItem
+            var itemIndex = index;
+            var item = new Button
             {
-                Content = id,
-                Tag = index,
-                Padding = new Thickness(10, 8, 10, 8),
-                Margin = new Thickness(0, 1, 0, 1),
-                IsSelected = index == _selectedProfileIndex
+                Style = (Style)FindResource("ProfileItemButtonStyle"),
+                Tag = index == _selectedProfileIndex ? "active" : null
             };
-            list.Items.Add(item);
+            item.Click += (_, _) =>
+            {
+                _selectedProfileIndex = itemIndex;
+                BuildCurrentPage();
+            };
+
+            var itemGrid = new Grid();
+            itemGrid.ColumnDefinitions.Add(new ColumnDefinition());
+            itemGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var copy = new StackPanel();
+            copy.Children.Add(new TextBlock
+            {
+                Text = id,
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            copy.Children.Add(new TextBlock
+            {
+                Text = ProfileSummary(profileNode),
+                FontSize = 10,
+                Foreground = MutedBrush,
+                Margin = new Thickness(0, 3, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            var badges = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
+            if (string.Equals(id, _controller.ProfileOverride, StringComparison.OrdinalIgnoreCase))
+            {
+                badges.Children.Add(new TextBlock { Text = T("Active"), FontSize = 10, Foreground = AccentBrush, FontWeight = FontWeights.SemiBold });
+            }
+            if (string.Equals(id, GetString("profiles.defaultProfileId"), StringComparison.OrdinalIgnoreCase))
+            {
+                badges.Children.Add(new TextBlock { Text = T("Default"), FontSize = 10, Foreground = AccentBrush });
+            }
+            Grid.SetColumn(copy, 0);
+            Grid.SetColumn(badges, 1);
+            itemGrid.Children.Add(copy);
+            itemGrid.Children.Add(badges);
+            item.Content = itemGrid;
+            list.Children.Add(item);
         }
-        list.SelectionChanged += (_, _) =>
+        sidebar.Children.Add(new ScrollViewer
         {
-            if (_building || list.SelectedItem is not ListBoxItem { Tag: int index }) return;
-            _selectedProfileIndex = index;
-            BuildCurrentPage();
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Content = list
+        });
+        var sidebarSurface = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0xF7, 0xF8, 0xF6)),
+            Child = sidebar
         };
-        sidebar.Children.Add(list);
-        Grid.SetColumn(sidebar, 0);
-        grid.Children.Add(sidebar);
+        Grid.SetColumn(sidebarSurface, 0);
+        grid.Children.Add(sidebarSurface);
         var separator = new Border { Background = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)) };
         Grid.SetColumn(separator, 1);
         grid.Children.Add(separator);
@@ -67,7 +137,7 @@ public partial class NativeMainWindow
         }
 
         EnsureProfileDefaults(profile);
-        var profileContent = new StackPanel { MaxWidth = 920, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var profileContent = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
         profileContent.Children.Add(BuildProfileHeader(profile));
         profileContent.Children.Add(BuildProfileTabs());
         profileContent.Children.Add(_profileTab switch
@@ -76,7 +146,7 @@ public partial class NativeMainWindow
             "output" => BuildProfileOutput(profile),
             _ => BuildProfileInput(profile)
         });
-        var scroll = Page(profileContent);
+        var scroll = Page(profileContent, 820, 0);
         Grid.SetColumn(scroll, 2);
         grid.Children.Add(scroll);
         return grid;
@@ -84,36 +154,25 @@ public partial class NativeMainWindow
 
     private UIElement BuildProfileHeader(JsonObject profile)
     {
-        var root = new StackPanel();
         var id = profile["id"]?.GetValue<string>() ?? string.Empty;
-        var name = new TextBox { Text = id, MinWidth = 260 };
-        name.KeyDown += (_, eventArgs) =>
-        {
-            if (eventArgs.Key == Key.Enter)
-            {
-                Keyboard.ClearFocus();
-                eventArgs.Handled = true;
-            }
-        };
-        name.LostKeyboardFocus += (_, _) => RenameProfile(name, id);
-
         var isDefault = string.Equals(GetString("profiles.defaultProfileId"), id, StringComparison.OrdinalIgnoreCase);
         var enabled = new CheckBox
         {
-            Content = T("Enabled"),
             IsChecked = profile["enabled"]?.GetValue<bool>() != false,
             IsEnabled = !isDefault,
-            ToolTip = isDefault ? "The default profile must remain enabled." : null
+            Width = 34,
+            ToolTip = isDefault ? T("The default profile must remain enabled.") : T("Enable profile")
         };
         enabled.Checked += (_, _) => { profile["enabled"] = true; MarkDirty(); };
         enabled.Unchecked += (_, _) => { profile["enabled"] = false; MarkDirty(); };
 
-        var actions = new WrapPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(0, 10, 0, 16)
-        };
+        var actions = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        actions.ColumnDefinitions.Add(new ColumnDefinition());
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var use = ActionButton(T("Use profile"), async (_, _) =>
         {
             await SaveNowAsync();
@@ -133,34 +192,42 @@ public partial class NativeMainWindow
             Set("profiles.defaultProfileId", profile["id"]?.GetValue<string>() ?? string.Empty);
             MarkDirty();
         });
-        var automatic = ActionButton(T("Automatic routing"), async (_, _) =>
+        var runtime = new TextBlock
         {
-            await SaveNowAsync();
-            if (_dirty) return;
-            try
-            {
-                await _controller.SetProfileOverrideAsync(null);
-                UpdateTopbar();
-            }
-            catch (Exception exception)
-            {
-                ShowError(exception);
-            }
-        });
-        var duplicate = ActionButton(T("Duplicate"), OnDuplicateProfile);
-        var delete = ActionButton(T("Delete"), OnDeleteProfile);
+            Text = string.IsNullOrWhiteSpace(_controller.ProfileOverride)
+                ? T("Runtime: automatic")
+                : $"{T("Runtime")}: {_controller.ProfileOverride}",
+            FontSize = 10,
+            Foreground = MutedBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(9, 0, 0, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        var duplicate = IconButton("\uE8C8", T("Duplicate profile"), OnDuplicateProfile);
+        var delete = IconButton("\uE74D", T("Delete profile"), OnDeleteProfile, true);
         delete.IsEnabled = profile["builtIn"]?.GetValue<bool>() != true;
-        foreach (var button in new[] { use, automatic, setDefault, duplicate, delete })
+        use.Margin = new Thickness(8, 0, 7, 0);
+        setDefault.Margin = new Thickness(0, 0, 0, 0);
+        duplicate.Margin = new Thickness(0, 0, 6, 0);
+        Grid.SetColumn(enabled, 0);
+        Grid.SetColumn(use, 1);
+        Grid.SetColumn(setDefault, 2);
+        Grid.SetColumn(runtime, 3);
+        Grid.SetColumn(duplicate, 4);
+        Grid.SetColumn(delete, 5);
+        actions.Children.Add(enabled);
+        actions.Children.Add(use);
+        actions.Children.Add(setDefault);
+        actions.Children.Add(runtime);
+        actions.Children.Add(duplicate);
+        actions.Children.Add(delete);
+        return new Border
         {
-            button.Height = 34;
-            button.Margin = new Thickness(0, 0, 7, 7);
-            actions.Children.Add(button);
-        }
-
-        root.Children.Add(Field(T("Profile name"), name));
-        root.Children.Add(enabled);
-        root.Children.Add(actions);
-        return root;
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(0, 22, 0, 18),
+            Child = actions
+        };
     }
 
     private UIElement BuildProfileTabs()
@@ -168,7 +235,7 @@ public partial class NativeMainWindow
         var tabs = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Margin = new Thickness(0, 0, 0, 20)
+            Height = 46
         };
         foreach (var (id, label) in new[]
         {
@@ -177,57 +244,77 @@ public partial class NativeMainWindow
             ("output", T("Output"))
         })
         {
-            var button = ActionButton(label, (_, _) =>
+            var button = new Button
+            {
+                Content = label,
+                Style = (Style)FindResource("TabButtonStyle"),
+                Tag = id == _profileTab ? "active" : null
+            };
+            button.Click += (_, _) =>
             {
                 _profileTab = id;
                 BuildCurrentPage();
-            }, id == _profileTab);
-            button.MinWidth = 110;
-            button.Margin = new Thickness(0, 0, 8, 0);
+            };
             tabs.Children.Add(button);
         }
-        return tabs;
+        return new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = tabs
+        };
     }
 
     private UIElement BuildProfileInput(JsonObject profile)
     {
         var basePath = $"profiles.items.{_selectedProfileIndex}";
         var content = new StackPanel();
-        var processNames = profile["match"]?["processNames"]?.AsArray()
-            .Select(item => item?.GetValue<string>())
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .ToArray() ?? Array.Empty<string?>();
+        var id = profile["id"]?.GetValue<string>() ?? string.Empty;
+        var name = new TextBox { Text = id };
+        name.KeyDown += (_, eventArgs) =>
+        {
+            if (eventArgs.Key == Key.Enter)
+            {
+                Keyboard.ClearFocus();
+                eventArgs.Handled = true;
+            }
+        };
+        name.LostKeyboardFocus += (_, _) => RenameProfile(name, id);
         var processText = new TextBox
         {
-            Text = string.Join(Environment.NewLine, processNames),
-            AcceptsReturn = true,
-            MinHeight = 62,
-            TextWrapping = TextWrapping.Wrap,
+            Text = ProfileSummary(profile),
             IsReadOnly = true
         };
-        var processButton = ActionButton(T("Choose processes"), (_, _) => OpenProcessPicker(profile));
-        processButton.Margin = new Thickness(0, 7, 0, 0);
+        var processButton = IconButton("\uE721", T("Choose processes"), (_, _) => OpenProcessPicker(profile));
+        var processRow = new Grid();
+        processRow.ColumnDefinitions.Add(new ColumnDefinition());
+        processRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
+        processRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+        Grid.SetColumn(processText, 0);
+        Grid.SetColumn(processButton, 2);
+        processRow.Children.Add(processText);
+        processRow.Children.Add(processButton);
         content.Children.Add(Section(
             T("Application"),
-            processNames.Length == 0 ? "PTT uses the foreground application." : string.Empty,
-            Field(T("Target processes"), processText),
-            processButton));
+            T(profile["builtIn"]?.GetValue<bool>() == true ? "Built-in profile" : "Custom profile"),
+            Field(T("Profile name"), name),
+            Field(T("Process names"), processRow, T("Leave empty to use the application that is in the foreground when PTT is pressed."))));
 
         var mode = GetString($"{basePath}.input.mode", "keyboard");
-        var modeCombo = BoundCombo(
+        var modeControl = SegmentedControl(
             $"{basePath}.input.mode",
             new[]
             {
                 new Option("keyboard", T("Keyboard")),
                 new Option("mouse", T("Mouse")),
-                new Option("gamepad", T("Gamepad")),
+                new Option("xinput", T("Gamepad")),
                 new Option("steamvr", T("SteamVR"))
-            },
-            rebuild: true);
+            });
+        modeControl.Margin = new Thickness(0, 0, 0, 16);
         var triggerFields = new StackPanel();
-        triggerFields.Children.Add(Field(T("Trigger type"), modeCombo));
+        triggerFields.Children.Add(modeControl);
         triggerFields.Children.Add(BuildTriggerBinding(profile, basePath, mode));
-        content.Children.Add(Section(T("Push to talk"), string.Empty, triggerFields));
+        content.Children.Add(Section(T("Push to talk"), T("Trigger binding"), triggerFields));
 
         var microphones = new List<Option> { new(string.Empty, T("Default communications device")) };
         microphones.AddRange(GetMicrophones().Select(device => new Option(device.Id, device.Name)));
@@ -281,7 +368,7 @@ public partial class NativeMainWindow
             stack.Children.Add(Field(T("Mouse"), row));
             stack.Children.Add(BoundCheckBox(T("Suppress trigger"), $"{basePath}.input.mouse.suppressButton"));
         }
-        else if (mode == "gamepad")
+        else if (mode == "xinput")
         {
             var userIndex = GetInt($"{basePath}.input.gamepad.userIndex");
             var mask = GetInt($"{basePath}.input.gamepad.buttonMask");
@@ -580,6 +667,17 @@ public partial class NativeMainWindow
             var candidate = $"{prefix} {suffix}";
             if (!names.Contains(candidate)) return candidate;
         }
+    }
+
+    private string ProfileSummary(JsonObject? profile)
+    {
+        var processes = profile?["match"]?["processNames"]?.AsArray()
+            .Select(item => item?.GetValue<string>())
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .ToArray() ?? Array.Empty<string?>();
+        return processes.Length == 0
+            ? T("Current foreground application")
+            : string.Join(", ", processes);
     }
 
     private void OpenProcessPicker(JsonObject profile)

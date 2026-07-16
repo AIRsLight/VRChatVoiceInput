@@ -28,13 +28,18 @@ public partial class NativeMainWindow
         {
             var localProvider = provider.Key;
             var installed = IsAnyModelCombinationAvailable(localProvider);
-            var button = ActionButton($"{(installed ? "●" : "○")} {provider.Value}", (_, _) =>
+            var button = new Button
+            {
+                Content = $"{(installed ? "●" : "○")} {provider.Value}",
+                Style = (Style)FindResource("ModelTabButtonStyle"),
+                Tag = localProvider == _selectedProvider ? "active" : null
+            };
+            button.Click += (_, _) =>
             {
                 _selectedProvider = localProvider;
                 BuildCurrentPage();
-            }, localProvider == _selectedProvider);
+            };
             button.Foreground = installed && localProvider != _selectedProvider ? SuccessBrush : button.Foreground;
-            button.Margin = new Thickness(0, 0, 8, 0);
             tabs.Children.Add(button);
         }
         root.Children.Add(tabs);
@@ -47,17 +52,20 @@ public partial class NativeMainWindow
             !available));
         root.Children.Add(new Border { Height = 18 });
 
-        root.Children.Add(BuildModelAssets());
+        root.Children.Add(BuildModelAssets(primaryOnly: true));
         root.Children.Add(BuildModelFacts());
+        root.Children.Add(BuildModelAssets(primaryOnly: false));
         root.Children.Add(BuildModelBackendOptions());
         root.Children.Add(BuildAdvancedModelSettings());
-        return Page(root);
+        return Page(root, 920, 24);
     }
 
-    private UIElement BuildModelAssets()
+    private UIElement BuildModelAssets(bool primaryOnly)
     {
+        var primaryComponent = PrimaryModelComponent(_selectedProvider);
         var assets = ModelDownloadCatalog.GetAssetStatuses()
             .Where(asset => asset.ProviderId == _selectedProvider)
+            .Where(asset => primaryOnly == (asset.ComponentId == primaryComponent))
             .GroupBy(asset => asset.ComponentId)
             .OrderBy(group => ModelComponentOrder(group.Key))
             .ToArray();
@@ -74,19 +82,22 @@ public partial class NativeMainWindow
                 MinHeight = 58
             };
             row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(primaryOnly ? 0 : 230) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(105) });
 
-            var title = new StackPanel { Margin = new Thickness(12, 8, 10, 8), VerticalAlignment = VerticalAlignment.Center };
-            title.Children.Add(new TextBlock { Text = ComponentLabel(group.Key), FontSize = 12, FontWeight = FontWeights.SemiBold });
-            title.Children.Add(new TextBlock
+            if (!primaryOnly)
             {
-                Text = ComponentDescription(group.Key), FontSize = 10, Foreground = MutedBrush,
-                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0)
-            });
-            Grid.SetColumn(title, 0);
-            row.Children.Add(title);
+                var title = new StackPanel { Margin = new Thickness(12, 8, 10, 8), VerticalAlignment = VerticalAlignment.Center };
+                title.Children.Add(new TextBlock { Text = ComponentLabel(group.Key), FontSize = 12, FontWeight = FontWeights.SemiBold });
+                title.Children.Add(new TextBlock
+                {
+                    Text = ComponentDescription(group.Key), FontSize = 10, Foreground = MutedBrush,
+                    TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0)
+                });
+                Grid.SetColumn(title, 0);
+                row.Children.Add(title);
+            }
 
             FrameworkElement selector;
             if (componentAssets.Length > 1)
@@ -97,7 +108,7 @@ public partial class NativeMainWindow
                     DisplayMemberPath = nameof(ModelAssetOption.Label),
                     SelectedValuePath = nameof(ModelAssetOption.Asset),
                     SelectedValue = selected,
-                    Margin = new Thickness(8),
+                    Margin = primaryOnly ? new Thickness(0, 8, 8, 8) : new Thickness(8),
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 combo.SelectionChanged += (_, _) =>
@@ -114,17 +125,25 @@ public partial class NativeMainWindow
                     Text = selected.Variant,
                     Foreground = MutedBrush,
                     FontSize = 11,
-                    Margin = new Thickness(12, 0, 8, 0),
+                    Margin = primaryOnly ? new Thickness(0, 0, 8, 0) : new Thickness(12, 0, 8, 0),
                     VerticalAlignment = VerticalAlignment.Center
                 };
             }
-            Grid.SetColumn(selector, 1);
+            Grid.SetColumn(selector, primaryOnly ? 0 : 1);
             row.Children.Add(selector);
             BuildAssetAction(row, selected);
             rows.Children.Add(row);
         }
 
-        return Section(T("Quantization and components"), string.Empty, rows);
+        return primaryOnly
+            ? Section(
+                T(_selectedProvider == "funasr-nano-gguf" ? "Language model quantization" : "Quantization"),
+                T("Select an installed version to use it, or download a missing version first."),
+                rows)
+            : Section(
+                T("Model components and optional capabilities"),
+                T("Install only the components and capabilities needed by this model."),
+                rows);
     }
 
     private void BuildAssetAction(Grid row, ModelAssetStatus asset)
@@ -211,29 +230,80 @@ public partial class NativeMainWindow
                 "Broad language coverage when higher latency is acceptable.")
         };
 
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        var primaryAssets = ModelDownloadCatalog.GetAssetStatuses()
+            .Where(asset => asset.ProviderId == _selectedProvider && asset.ComponentId == PrimaryModelComponent(_selectedProvider))
+            .ToArray();
+        var selectedAsset = primaryAssets.FirstOrDefault(IsAssetActive)
+            ?? primaryAssets.FirstOrDefault(asset => asset.Installed)
+            ?? primaryAssets.FirstOrDefault();
+
+        var grid = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.35, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.7, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.7, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.7, GridUnitType.Star) });
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition());
         var languages = FactCell(T("Languages"), T(fact.Languages));
+        var files = FactCell(T("Model files"), selectedAsset is null ? T("Not measured") : FormatBytes(selectedAsset.Size));
         var memory = FactCell(T("Estimated peak RAM"), fact.Performance.Ram);
-        var throughput = FactCell(T("Tested throughput"), fact.Performance.Throughput);
+        var throughput = FactCell(T("Tested throughput"), fact.Performance.Throughput, rightBorder: false);
         Grid.SetColumn(languages, 0);
-        Grid.SetColumn(memory, 1);
-        Grid.SetColumn(throughput, 2);
+        Grid.SetColumn(files, 1);
+        Grid.SetColumn(memory, 2);
+        Grid.SetColumn(throughput, 3);
         grid.Children.Add(languages);
+        grid.Children.Add(files);
         grid.Children.Add(memory);
         grid.Children.Add(throughput);
-        return Section(
-            T("Model information"),
-            T("Results vary by hardware, audio, backend, and selected quantization."),
-            grid,
-            Field(T("Best suited for"), new TextBlock
-            {
-                Text = T(fact.BestFor),
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 12
-            }));
+
+        var best = new Grid { Margin = new Thickness(12, 10, 12, 10) };
+        best.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+        best.ColumnDefinitions.Add(new ColumnDefinition());
+        best.Children.Add(new TextBlock { Text = T("Best suited for"), FontSize = 10, Foreground = MutedBrush });
+        var bestText = new TextBlock
+        {
+            Text = T(fact.BestFor),
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold
+        };
+        Grid.SetColumn(bestText, 1);
+        best.Children.Add(bestText);
+        var bestBorder = new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Child = best
+        };
+        Grid.SetRow(bestBorder, 1);
+        Grid.SetColumnSpan(bestBorder, 4);
+        grid.Children.Add(bestBorder);
+
+        var note = new TextBlock
+        {
+            Text = T("Results vary by hardware, audio, backend, and selected quantization."),
+            FontSize = 10,
+            Foreground = MutedBrush,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(12, 7, 12, 7)
+        };
+        var noteBorder = new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Child = note
+        };
+        Grid.SetRow(noteBorder, 2);
+        Grid.SetColumnSpan(noteBorder, 4);
+        grid.Children.Add(noteBorder);
+        return new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)),
+            BorderThickness = new Thickness(0, 1, 0, 1),
+            Child = grid
+        };
     }
 
     private (string Ram, string Throughput) ParaformerRamAndThroughput()
@@ -260,7 +330,7 @@ public partial class NativeMainWindow
         };
     }
 
-    private Border FactCell(string label, string value)
+    private Border FactCell(string label, string value, bool rightBorder = true)
     {
         var stack = new StackPanel();
         stack.Children.Add(new TextBlock { Text = label, FontSize = 10, Foreground = MutedBrush });
@@ -274,9 +344,9 @@ public partial class NativeMainWindow
         });
         return new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(0xF7, 0xF8, 0xF6)),
-            Margin = new Thickness(0, 0, 8, 10),
             Padding = new Thickness(12, 10, 12, 10),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)),
+            BorderThickness = rightBorder ? new Thickness(0, 0, 1, 0) : new Thickness(0),
             Child = stack
         };
     }
@@ -378,9 +448,10 @@ public partial class NativeMainWindow
             Field(T("Minimum speech (seconds)"), BoundDoubleBox("asr.streaming.minimumSpeechSeconds", 0.05, 5)),
             Field(T("Maximum segment (seconds)"), BoundDoubleBox("asr.streaming.maximumSegmentSeconds", 1, 60))));
         panel.Children.Add(Field("Silero VAD", PathField("asr.streaming.sileroVadModelPath", "model")));
-        return new Expander
+        var expander = new Expander
         {
             Header = T("Advanced model configuration"),
+            IsExpanded = _advancedModelSettingsOpen,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 20),
             Content = new Border
@@ -392,6 +463,9 @@ public partial class NativeMainWindow
                 Child = panel
             }
         };
+        expander.Expanded += (_, _) => _advancedModelSettingsOpen = true;
+        expander.Collapsed += (_, _) => _advancedModelSettingsOpen = false;
+        return expander;
     }
 
     private FrameworkElement PathField(string path, string kind)
@@ -450,13 +524,20 @@ public partial class NativeMainWindow
     {
         var assets = ModelDownloadCatalog.GetAssetStatuses().Where(asset => asset.ProviderId == providerId).ToArray();
         var hasRuntime = providerId == "qwen3-asr" || assets.Any(asset => asset.ComponentId.StartsWith("runtime-") && asset.Installed);
-        var primary = providerId == "funasr-nano-gguf" ? "language-model" : providerId == "qwen3-asr" ? "model-bundle" : "model";
+        var primary = PrimaryModelComponent(providerId);
         var hasPrimary = assets.Any(asset => asset.ComponentId == primary && asset.Installed);
         var hasEncoder = providerId != "funasr-nano-gguf" || assets.Any(asset => asset.ComponentId == "encoder" && asset.Installed);
         var punctuation = providerId != "paraformer-gguf" || !GetBool("asr.paraformer.usePunctuation") ||
             assets.Any(asset => asset.ComponentId == "punctuation" && asset.Installed);
         return hasRuntime && hasPrimary && hasEncoder && punctuation;
     }
+
+    private static string PrimaryModelComponent(string providerId) => providerId switch
+    {
+        "funasr-nano-gguf" => "language-model",
+        "qwen3-asr" => "model-bundle",
+        _ => "model"
+    };
 
     private bool IsAssetActive(ModelAssetStatus asset)
     {
@@ -622,8 +703,15 @@ public partial class NativeMainWindow
         ]
     };
 
-    private sealed record ModelAssetOption(ModelAssetStatus Asset, string Label);
-    private sealed record GpuOption(int Index, string Label);
+    private sealed record ModelAssetOption(ModelAssetStatus Asset, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record GpuOption(int Index, string Label)
+    {
+        public override string ToString() => Label;
+    }
     private sealed record AdvancedField(string Label, string Path, string Kind, bool Numeric = false, int Minimum = 0, int Maximum = 0);
     private sealed record ModelFact(string Languages, (string Ram, string Throughput) Performance, string BestFor);
 }

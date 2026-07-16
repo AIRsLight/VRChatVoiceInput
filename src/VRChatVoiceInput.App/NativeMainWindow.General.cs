@@ -11,7 +11,7 @@ public partial class NativeMainWindow
 {
     private UIElement BuildGeneralPage()
     {
-        var content = new StackPanel { MaxWidth = 920, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var content = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
 
         var language = new ComboBox
         {
@@ -36,17 +36,21 @@ public partial class NativeMainWindow
         };
 
         content.Children.Add(Section(
-            T("Application"),
-            T("Changes are saved automatically."),
+            T("Service"),
+            T("Desktop lifecycle"),
+            BoundCheckBox(T("Start service when the application opens"), "application.startRuntimeOnLaunch"),
+            BoundCheckBox(T("Keep running when the settings window closes"), "application.closeToTray"),
+            BoundCheckBox(T("Start with Windows"), "application.startWithWindows")));
+
+        content.Children.Add(Section(
+            T("Interface language"),
+            T("Unsupported system languages fall back to English."),
             Field(T("Settings interface"), BoundCombo("application.settingsInterface", new[]
             {
                 new Option("webview", "WebView2"),
                 new Option("native-wpf", "Native WPF")
             }), T("The selected interface is used the next time settings are opened.")),
-            Field(T("Interface language"), language),
-            BoundCheckBox(T("Start service when the application opens"), "application.startRuntimeOnLaunch"),
-            BoundCheckBox(T("Keep running when the settings window closes"), "application.closeToTray"),
-            BoundCheckBox(T("Start with Windows"), "application.startWithWindows")));
+            Field(T("Interface language"), language)));
 
         var microphones = GetMicrophones();
         var microphoneOptions = new List<Option>
@@ -83,32 +87,55 @@ public partial class NativeMainWindow
         };
         DockPanel.SetDock(microphoneTestButton, Dock.Right);
         testHeader.Children.Add(microphoneTestButton);
-        testHeader.Children.Add(testTitle);
+        var testCopy = new StackPanel();
+        testCopy.Children.Add(testTitle);
+        testCopy.Children.Add(new TextBlock
+        {
+            Text = T("Shows live input from every active microphone."),
+            FontSize = 10,
+            Foreground = MutedBrush,
+            Margin = new Thickness(0, 4, 0, 0)
+        });
+        testHeader.Children.Add(testCopy);
         _microphoneMeters = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
-
-        content.Children.Add(Section(
-            T("Audio"),
-            string.Empty,
-            TwoColumns(
-                Field(T("Microphone"), microphone),
-                Field(T("Minimum recording (ms)"), BoundNumberBox("audio.minimumDurationMs", 100, 5000))),
-            testHeader,
-            _microphoneMeters));
 
         var profileOptions = Profiles
             .OfType<JsonObject>()
             .Select(profile => new Option(profile["id"]?.GetValue<string>() ?? string.Empty, profile["id"]?.GetValue<string>() ?? string.Empty));
-        content.Children.Add(Section(
-            T("Profiles"),
-            string.Empty,
-            Field(T("Default profile on startup"), BoundCombo("profiles.defaultProfileId", profileOptions))));
 
-        var reveal = ActionButton(T("Show configuration file"), (_, _) => RevealPath(_controller.ConfigurationPath));
+        content.Children.Add(Section(
+            T("Audio"),
+            T("Shared capture device"),
+            Field(T("Microphone"), microphone),
+            TwoColumns(
+                Field(T("Minimum recording (ms)"), BoundNumberBox("audio.minimumDurationMs", 100, 5000)),
+                Field(T("Default profile on startup"), BoundCombo("profiles.defaultProfileId", profileOptions))),
+            testHeader,
+            _microphoneMeters));
+
+        var path = new TextBox { Text = _controller.ConfigurationPath, IsReadOnly = true };
+        var reveal = new Button
+        {
+            Width = 34,
+            Height = 34,
+            Padding = new Thickness(0),
+            Style = (Style)FindResource("ActionButtonStyle"),
+            ToolTip = T("Show configuration file"),
+            Content = new TextBlock { Text = "\uE8B7", FontFamily = new FontFamily("Segoe Fluent Icons"), FontSize = 14 }
+        };
+        reveal.Click += (_, _) => RevealPath(_controller.ConfigurationPath);
+        var pathRow = new Grid();
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition());
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
+        pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+        Grid.SetColumn(path, 0);
+        Grid.SetColumn(reveal, 2);
+        pathRow.Children.Add(path);
+        pathRow.Children.Add(reveal);
         content.Children.Add(Section(
             T("Configuration"),
-            _controller.ConfigurationPath,
-            reveal,
-            Notice(T("The native WPF interface is enabled. WebView2 remains available in settings or with --web-ui."))));
+            T("Schema 1"),
+            Field(T("File"), pathRow)));
 
         return Page(content);
     }

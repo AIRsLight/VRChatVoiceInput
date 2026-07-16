@@ -39,6 +39,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
     private int _selectedProfileIndex;
     private string _profileTab = "input";
     private string _selectedProvider = "sensevoice-gguf";
+    private bool _advancedModelSettingsOpen;
     private bool _building;
     private bool _dirty;
     private bool _saving;
@@ -50,6 +51,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
     private TextBlock? _diagnosticMemoryText;
     private TextBlock? _diagnosticAverageText;
     private StackPanel? _diagnosticLogPanel;
+    private string? _diagnosticProfileId;
     private ModelDownloadProgress? _downloadProgress;
 
     public NativeMainWindow(RuntimeController controller)
@@ -172,7 +174,7 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         {
             "profiles" => CurrentProfile?["id"]?.GetValue<string>() ?? string.Empty,
             "models" => _selectedProvider,
-            "diagnostics" => AppFileLogger.CurrentLogPath,
+            "diagnostics" => FormatLogCount(_controller.GetRuntimeDiagnosticSnapshot().Logs.Count),
             _ => _controller.ConfigurationPath
         };
         PageTitle.Text = _view switch
@@ -195,6 +197,13 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         SaveStatusText.Text = T(_saving ? "Saving..." : _dirty ? "Waiting to save" : "Saved");
         SaveStatusText.Foreground = _saving ? MutedBrush : _dirty ? WarningBrush : SuccessBrush;
     }
+
+    private string FormatLogCount(int count) => NativeLocalization.Resolve(GetString("application.uiLanguage", "auto")) switch
+    {
+        "zh" => $"{count} 条日志",
+        "ja" => $"{count} 件のログ",
+        _ => $"{count} log entries"
+    };
 
     private async void OnRuntimeToggle(object sender, RoutedEventArgs eventArgs)
     {
@@ -402,52 +411,74 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         _toastTimer.Start();
     }
 
-    private ScrollViewer Page(UIElement content) => new()
+    private ScrollViewer Page(UIElement content, double maxWidth = 920, double topPadding = 4)
     {
-        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-        Padding = new Thickness(24, 22, 24, 28),
-        Content = content
-    };
+        var container = new Border
+        {
+            MaxWidth = maxWidth,
+            Padding = new Thickness(28, topPadding, 28, 48),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Child = content
+        };
+        return new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Content = container
+        };
+    }
 
     private Border Section(string title, string subtitle, params UIElement[] children)
     {
-        var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = title, FontSize = 14, FontWeight = FontWeights.SemiBold });
+        var heading = new StackPanel();
+        heading.Children.Add(new TextBlock { Text = title, FontSize = 13, FontWeight = FontWeights.SemiBold });
         if (!string.IsNullOrWhiteSpace(subtitle))
         {
-            stack.Children.Add(new TextBlock
+            heading.Children.Add(new TextBlock
             {
                 Text = subtitle,
                 FontSize = 11,
                 Foreground = MutedBrush,
-                Margin = new Thickness(0, 2, 0, 14)
+                TextWrapping = TextWrapping.Wrap,
+                LineHeight = 16,
+                Margin = new Thickness(0, 5, 0, 0)
             });
         }
-        else
-        {
-            stack.Children.Add(new Border { Height = 12 });
-        }
+
+        var body = new StackPanel();
         foreach (var child in children)
         {
-            stack.Children.Add(child);
+            body.Children.Add(child);
         }
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(210) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        Grid.SetColumn(heading, 0);
+        Grid.SetColumn(body, 2);
+        grid.Children.Add(heading);
+        grid.Children.Add(body);
 
         return new Border
         {
-            Style = (Style)FindResource("SectionStyle"),
-            Child = stack
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xDE, 0xD9)),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(0, 22, 0, 26),
+            Child = grid
         };
     }
 
     private FrameworkElement Field(string label, UIElement control, string? help = null)
     {
-        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
         stack.Children.Add(new TextBlock
         {
             Text = label,
             FontSize = 11,
             FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x4F, 0x58, 0x52)),
             Margin = new Thickness(0, 0, 0, 5)
         });
         stack.Children.Add(control);
@@ -459,7 +490,8 @@ public partial class NativeMainWindow : Window, ISettingsWindow
                 Foreground = MutedBrush,
                 FontSize = 10,
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 4, 0, 0)
+                LineHeight = 14.5,
+                Margin = new Thickness(0, 5, 0, 0)
             });
         }
         return stack;
@@ -472,8 +504,8 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         Grid.SetColumn(left, 0);
         Grid.SetColumn(right, 1);
-        if (left is FrameworkElement leftElement) leftElement.Margin = new Thickness(0, 0, 8, 0);
-        if (right is FrameworkElement rightElement) rightElement.Margin = new Thickness(8, 0, 0, 0);
+        if (left is FrameworkElement leftElement) leftElement.Margin = new Thickness(0, 0, 7, 0);
+        if (right is FrameworkElement rightElement) rightElement.Margin = new Thickness(7, 0, 0, 0);
         grid.Children.Add(left);
         grid.Children.Add(right);
         return grid;
@@ -485,6 +517,24 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         {
             Content = text,
             Style = (Style)FindResource(primary ? "PrimaryButtonStyle" : "ActionButtonStyle")
+        };
+        button.Click += handler;
+        return button;
+    }
+
+    private Button IconButton(string glyph, string toolTip, RoutedEventHandler handler, bool danger = false)
+    {
+        var button = new Button
+        {
+            Style = (Style)FindResource("IconButtonStyle"),
+            ToolTip = toolTip,
+            Foreground = danger ? DangerBrush : new SolidColorBrush(Color.FromRgb(0x20, 0x26, 0x22)),
+            Content = new TextBlock
+            {
+                Text = glyph,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontSize = 14
+            }
         };
         button.Click += handler;
         return button;
@@ -558,6 +608,42 @@ public partial class NativeMainWindow : Window, ISettingsWindow
             MarkDirty(rebuild);
         };
         return combo;
+    }
+
+    private FrameworkElement SegmentedControl(string path, IEnumerable<Option> options, bool rebuild = true)
+    {
+        var values = options.ToArray();
+        var grid = new Grid();
+        var current = GetString(path);
+        for (var index = 0; index < values.Length; index++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            var option = values[index];
+            var button = new Button
+            {
+                Content = option.Label,
+                Style = (Style)FindResource("SegmentButtonStyle"),
+                MinWidth = 88,
+                Tag = string.Equals(option.Value, current, StringComparison.OrdinalIgnoreCase) ? "active" : null,
+                BorderThickness = index == values.Length - 1 ? new Thickness(0) : new Thickness(0, 0, 1, 0)
+            };
+            button.Click += (_, _) =>
+            {
+                Set(path, option.Value);
+                MarkDirty(rebuild);
+            };
+            Grid.SetColumn(button, index);
+            grid.Children.Add(button);
+        }
+        return new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xC3, 0xCB, 0xC5)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            ClipToBounds = true,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Child = grid
+        };
     }
 
     private JsonArray Profiles => GetNode("profiles.items")?.AsArray() ?? new JsonArray();
@@ -641,5 +727,8 @@ public partial class NativeMainWindow : Window, ISettingsWindow
         return $"{amount:0.#} {units[unit]}";
     }
 
-    private sealed record Option(string Value, string Label);
+    private sealed record Option(string Value, string Label)
+    {
+        public override string ToString() => Label;
+    }
 }
