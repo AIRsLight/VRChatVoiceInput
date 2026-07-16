@@ -32,6 +32,7 @@ import { gamepadButtonNames } from "./gamepad";
 import "./styles.css";
 
 interface ApplicationSettings {
+  settingsInterface: string;
   uiLanguage: string;
   startRuntimeOnLaunch: boolean;
   closeToTray: boolean;
@@ -618,6 +619,10 @@ function applyUiLanguage(setting: string): void {
 }
 
 function normalizeConfiguration(config: AppConfiguration): AppConfiguration {
+  config.application.settingsInterface ??= "webview";
+  if (!["webview", "native-wpf"].includes(config.application.settingsInterface)) {
+    config.application.settingsInterface = "webview";
+  }
   config.application.uiLanguage ??= "auto";
   if (!["auto", "zh", "ja", "en"].includes(config.application.uiLanguage)) {
     config.application.uiLanguage = "en";
@@ -906,7 +911,13 @@ function renderGeneral(): string {
     </section>
     <section class="settings-section">
       <div><h2 class="section-title">${t("Interface language")}</h2><div class="section-meta">${t("Unsupported system languages fall back to English.")}</div></div>
-      <div class="field-stack"><div class="field"><label for="ui-language">${t("Interface language")}</label>
+      <div class="field-stack"><div class="field"><label for="settings-interface">${t("Settings interface")}</label>
+        <select class="select" id="settings-interface" data-config-path="application.settingsInterface">
+          <option value="webview" ${config.application.settingsInterface === "webview" ? "selected" : ""}>WebView2</option>
+          <option value="native-wpf" ${config.application.settingsInterface === "native-wpf" ? "selected" : ""}>Native WPF</option>
+        </select>
+        <div class="field-help">${t("The selected interface is used the next time settings are opened.")}</div>
+      </div><div class="field"><label for="ui-language">${t("Interface language")}</label>
         <select class="select" id="ui-language" data-config-path="application.uiLanguage" data-ui-language="true">
           <option value="auto" ${config.application.uiLanguage === "auto" ? "selected" : ""}>${t("System language")}</option>
           <option value="zh" ${config.application.uiLanguage === "zh" ? "selected" : ""}>${t("Chinese")}</option>

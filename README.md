@@ -16,8 +16,8 @@ The current default is the local Paraformer Q5_0 GGUF provider on CPU. Q8_0 and 
 - Global keyboard, five-button mouse, XInput, and SteamVR action hold-to-talk with WASAPI microphone capture.
 - Captured-window chat workflow with open hotkey, configurable delay, clipboard/Unicode/keyboard input, submit hotkey, and focus-change protection.
 - Provider capability and recognition-option contracts with deferred terminology-hint support.
-- Per-application profiles with a running-process picker, dynamic foreground fallback, native keyboard/XInput binding capture, provider selection, hotwords, output method, and submission hotkeys. WebView2 is only the settings display layer; Windows input hooks perform keyboard capture.
-- WPF + WebView2 settings application with automatic configuration saves, tray lifecycle, runtime control, preset/model editors, live process memory and recognition timing diagnostics, per-preset output testing, and runtime logs. Native, model, bridge, and WebView failures are also written to daily files under `%LocalAppData%\VRChatVoiceInput\Logs` and retained for 14 days. Closing settings disposes WebView2; opening settings from the tray creates it again while the native runtime continues in the background.
+- Per-application profiles with a running-process picker, dynamic foreground fallback, native keyboard/XInput binding capture, provider selection, hotwords, output method, and submission hotkeys. Windows input hooks perform capture independently of the selected settings interface.
+- Parallel native WPF and WebView2 settings interfaces with automatic configuration saves, tray lifecycle, runtime control, preset/model editors, live process memory and recognition timing diagnostics, per-preset output testing, and runtime logs. WebView2 remains the default compatibility interface; `application.settingsInterface` can select `native-wpf`, while `--native-ui` and `--web-ui` provide one-run overrides. Native, model, bridge, WPF, and WebView failures are written to daily files under `%LocalAppData%\VRChatVoiceInput\Logs` and retained for 14 days.
 - Explicit runtime profile activation, per-profile microphone overrides, and installed-model availability checks.
 - Live native level meters for every active microphone.
 - Enumerated Vulkan GPU selection for the bundled SenseVoice and whisper.cpp Vulkan runtimes, including Intel and AMD integrated adapters exposed by the Windows graphics driver.
@@ -30,7 +30,7 @@ The staged implementation plan, including global keyboard/gamepad PTT and safe t
 
 The application profile schema is documented in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
-The WPF + WebView2 configuration architecture is documented in [docs/UI_ARCHITECTURE.md](docs/UI_ARCHITECTURE.md).
+The parallel native WPF and WebView2 configuration architecture is documented in [docs/UI_ARCHITECTURE.md](docs/UI_ARCHITECTURE.md).
 
 Initial CPU results for SenseVoice, Paraformer, Fun-ASR-Nano, Qwen3-ASR, and whisper.cpp are recorded in [docs/MODEL_BENCHMARK.md](docs/MODEL_BENCHMARK.md).
 
@@ -90,6 +90,14 @@ dotnet run --project src/VRChatVoiceInput.Cli -- --config appsettings.json --sel
 ```powershell
 dotnet run --project src/VRChatVoiceInput.App -c Release -- --config appsettings.json
 ```
+
+To try the native WPF settings surface without changing the saved preference:
+
+```powershell
+dotnet run --project src/VRChatVoiceInput.App -c Release -- --native-ui --config appsettings.json
+```
+
+Use `--web-ui` to force the existing WebView2 surface. The General page can persist either choice for subsequent settings windows.
 
 The development build can also be opened directly at `src/VRChatVoiceInput.App/bin/Release/net8.0-windows/VRChatVoiceInput.App.exe`. It searches its parent directories for the repository `appsettings.json`.
 

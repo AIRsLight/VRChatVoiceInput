@@ -1,0 +1,15 @@
+global using Brush = System.Windows.Media.Brush;
+global using Brushes = System.Windows.Media.Brushes;
+global using Button = System.Windows.Controls.Button;
+global using CheckBox = System.Windows.Controls.CheckBox;
+global using Color = System.Windows.Media.Color;
+global using ComboBox = System.Windows.Controls.ComboBox;
+global using FontFamily = System.Windows.Media.FontFamily;
+global using HorizontalAlignment = System.Windows.HorizontalAlignment;
+global using ListBox = System.Windows.Controls.ListBox;
+global using ListBoxItem = System.Windows.Controls.ListBoxItem;
+global using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+global using Orientation = System.Windows.Controls.Orientation;
+global using Panel = System.Windows.Controls.Panel;
+global using ProgressBar = System.Windows.Controls.ProgressBar;
+global using TextBox = System.Windows.Controls.TextBox;

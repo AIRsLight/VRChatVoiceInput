@@ -7,7 +7,7 @@ using Microsoft.Web.WebView2.Core;
 
 namespace VRChatVoiceInput.App;
 
-public partial class MainWindow : Window
+public partial class MainWindow : Window, ISettingsWindow
 {
     private const string AssetHost = "appassets.local";
     private readonly RuntimeController _runtimeController;
@@ -386,7 +386,7 @@ public partial class MainWindow : Window
             stream);
     }
 
-    internal void ShowUnhandledError(Exception exception)
+    public void ShowUnhandledError(Exception exception)
     {
         ShowInitializationError(
             $"{NativeLocalization.Translate(_runtimeController.LoadConfiguration().Application.UiLanguage, "The settings interface encountered an error.")} {exception.Message}");

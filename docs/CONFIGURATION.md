@@ -5,7 +5,7 @@
 Configuration is split into global runtime definitions and application profiles:
 
 - `schemaVersion`: configuration contract version; currently `1`.
-- `application`: desktop lifecycle and interface-language settings.
+- `application`: desktop lifecycle, settings-interface, and interface-language settings.
 - `audio`: global microphone and recording-duration defaults inherited by profiles.
 - `asr`: installed provider executables and model paths.
 - `profiles`: application matching and per-application behavior.
@@ -14,9 +14,11 @@ Provider model paths are global so multiple profiles can reuse one loaded model 
 
 ## Interface language
 
+`application.settingsInterface` accepts `webview` or `native-wpf`. `webview` remains the default. The General page persists the selection for the next settings window; `--native-ui` and `--web-ui` override it for the current application process without rewriting the preference.
+
 `application.uiLanguage` accepts `auto`, `zh`, `ja`, or `en`. `auto` maps Chinese, Japanese, and English Windows UI cultures to the corresponding interface; every unsupported system language falls back to English. The General page allows this value to be changed manually. The WebView settings UI, loading screen, message-box titles, and tray menu use the same setting.
 
-When `application.closeToTray` is `true`, closing the settings window keeps the native PTT/ASR service and tray icon running but disposes the WebView2 settings surface and its browser process. Opening settings from the tray creates a fresh window and WebView2 instance. Pending debounced configuration changes are saved before disposal; a validation or write failure keeps the window open.
+When `application.closeToTray` is `true`, closing the settings window keeps the native PTT/ASR service and tray icon running but disposes the selected settings surface. Closing WebView2 also releases its browser process. Opening settings from the tray creates a fresh window using the saved interface preference. Pending debounced configuration changes are saved before disposal; a validation or write failure keeps the window open.
 
 ## Profile selection
 

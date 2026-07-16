@@ -13,6 +13,7 @@ public partial class App : System.Windows.Application
     private TrayIconService? _trayIcon;
     private bool _isExiting;
     private bool _reopenLifecycleTestCompleted;
+    private bool? _nativeUiOverride;
 
     public bool IsExiting => _isExiting;
 
@@ -46,6 +47,13 @@ public partial class App : System.Windows.Application
             }
 
             _runtimeController = new RuntimeController(configPath);
+            _nativeUiOverride = eventArgs.Args.Any(arg =>
+                    string.Equals(arg, "--native-ui", StringComparison.OrdinalIgnoreCase))
+                ? true
+                : eventArgs.Args.Any(arg =>
+                    string.Equals(arg, "--web-ui", StringComparison.OrdinalIgnoreCase))
+                    ? false
+                    : null;
             _trayIcon = new TrayIconService(_runtimeController, ShowSettings, RequestExitAsync);
 
             var minimized = eventArgs.Args.Any(arg =>
@@ -91,10 +99,16 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var window = MainWindow as MainWindow;
+        var window = MainWindow;
         if (window is null)
         {
-            window = new MainWindow(_runtimeController);
+            var useNativeUi = _nativeUiOverride ?? string.Equals(
+                _runtimeController.LoadConfiguration().Application.SettingsInterface,
+                "native-wpf",
+                StringComparison.OrdinalIgnoreCase);
+            window = useNativeUi
+                ? new NativeMainWindow(_runtimeController)
+                : new MainWindow(_runtimeController);
             MainWindow = window;
         }
 
@@ -107,7 +121,7 @@ public partial class App : System.Windows.Application
         window.Activate();
     }
 
-    internal void OnSettingsWindowClosed(MainWindow window, bool keepRunning)
+    internal void OnSettingsWindowClosed(Window window, bool keepRunning)
     {
         if (ReferenceEquals(MainWindow, window))
         {
@@ -145,7 +159,7 @@ public partial class App : System.Windows.Application
         }
 
         _isExiting = true;
-        if (MainWindow is MainWindow window && !await window.CloseAfterSavingAsync())
+        if (MainWindow is ISettingsWindow window && !await window.CloseAfterSavingAsync())
         {
             _isExiting = false;
             return;
@@ -167,7 +181,7 @@ public partial class App : System.Windows.Application
     {
         AppFileLogger.Error("wpf", "Unhandled UI exception.", eventArgs.Exception);
         eventArgs.Handled = true;
-        if (MainWindow is MainWindow window)
+        if (MainWindow is ISettingsWindow window)
         {
             window.ShowUnhandledError(eventArgs.Exception);
             return;

@@ -2,9 +2,9 @@
 
 ## Decision
 
-Use a small .NET 8 WPF host with an embedded WebView2 configuration surface. This architecture is now implemented in `src/VRChatVoiceInput.App`.
+Use a .NET 8 WPF host with two interchangeable configuration surfaces: the established embedded WebView2 client and a native WPF client. WebView2 remains the compatibility default while the native client is exercised and completed. Both clients call the same `RuntimeController` and persist the same configuration schema.
 
-WebView2 is a configuration client only. Push-to-talk input, audio capture, ASR, window targeting, VRChat OSC, and provider lifecycle remain native .NET services and continue running when the configuration window is closed.
+Both settings surfaces are configuration clients only. Push-to-talk input, audio capture, ASR, window targeting, VRChat OSC, and provider lifecycle remain native .NET services and continue running when the configuration window is closed.
 
 ## Process shape
 
@@ -13,14 +13,13 @@ VoiceInput.App (WPF process)
   native shell
     tray icon
     startup and single-instance handling
-    WebView2 Runtime detection
-    WebView2 window lifecycle
-  WebView2 configuration UI
+    settings-surface selection
+  native WPF configuration UI
+    direct RuntimeController calls and events
+  optional WebView2 configuration UI
     packaged HTML/CSS/TypeScript assets
+    versioned message bridge
     no local HTTP server
-  message bridge
-    typed request/response messages
-    event notifications from .NET to UI
   existing .NET services
     PTT inputs
     audio capture
@@ -35,8 +34,9 @@ The first implementation should stay in one process. A separate worker process i
 
 - Start and stop background services independently of the configuration window.
 - Own the system tray icon, autostart setting, and application exit command.
-- Create the WebView2 control lazily when the user opens settings.
-- Save pending configuration and dispose the WebView2 settings surface whenever it closes; recreate it from the tray on demand while native services continue running.
+- Select native WPF or WebView2 from `application.settingsInterface`; allow `--native-ui` and `--web-ui` to override one process run.
+- Save pending configuration and dispose the selected settings surface whenever it closes; recreate the configured surface from the tray while native services continue running.
+- Create the WebView2 control lazily only when the WebView2 surface is selected.
 - Detect the Evergreen WebView2 Runtime before creating the control.
 - Offer the Microsoft Evergreen bootstrapper when the Runtime is missing.
 - Show a native recovery panel with retry and local-log actions if WebView2 cannot initialize or its rendering process fails.
@@ -44,7 +44,7 @@ The first implementation should stay in one process. A separate worker process i
 
 Windows 11 normally includes the Evergreen Runtime and most supported Windows 10 installations already have it. The installer must still detect the edge case where it is absent. Do not bundle Fixed Version by default because of its large package cost and separate update responsibility.
 
-## Web application responsibilities
+## Shared client responsibilities
 
 - Microphone and input-device selection.
 - Keyboard, mouse, XInput, and SteamVR binding configuration. Native host services capture keyboard, mouse, and XInput buttons; the web application only starts capture and displays the result.
@@ -53,7 +53,7 @@ Windows 11 normally includes the Evergreen Runtime and most supported Windows 10
 - Runtime download progress, provider health, benchmark results, live process memory, average recognition time, per-preset output tests, and diagnostic logs. Native, provider, bridge, WPF, and WebView failures are persisted to daily UTF-8 logs under `%LocalAppData%\VRChatVoiceInput\Logs` for 14 days; the Diagnostics view exposes the active path.
 - Debounced automatic configuration saves with validation errors returned by the native host. Changes made while a save is in progress remain dirty and are saved in the next pass.
 
-The UI should use TypeScript and Vite with locally packaged assets. A large frontend framework is unnecessary for the first settings application; choose one only when component complexity justifies it.
+The WebView2 client uses TypeScript and Vite with locally packaged assets. The native client uses WPF controls and partial page updates. Neither client owns runtime state or bypasses controller-side validation.
 
 ## Message bridge
 
@@ -100,6 +100,7 @@ The initial implementation gate has been met:
 - Keyboard/file input, captured-window output, and VRChat OSC paths are available.
 - The native host provides single-instance handling, tray lifecycle, runtime control, atomic configuration saves, model/profile editors, and diagnostics.
 - The packaged web assets are loaded through a local virtual host with arbitrary navigation, DevTools, context menus, and browser accelerators disabled.
+- The optional native WPF surface covers general settings, profile input/processing/output, model components and downloads, GPU selection, microphone monitoring, diagnostics, and output tests without creating a browser process.
 
 ## References
 
